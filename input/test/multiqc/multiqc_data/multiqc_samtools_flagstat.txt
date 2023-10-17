@@ -1,0 +1,10 @@
+Sample	total_passed	total_failed	secondary_passed	secondary_failed	supplementary_passed	supplementary_failed	duplicates_passed	duplicates_failed	mapped_passed	mapped_failed	mapped_passed_pct	mapped_failed_pct	paired in sequencing_passed	paired in sequencing_failed	read1_passed	read1_failed	read2_passed	read2_failed	properly paired_passed	properly paired_failed	properly paired_passed_pct	properly paired_failed_pct	with itself and mate mapped_passed	with itself and mate mapped_failed	singletons_passed	singletons_failed	singletons_passed_pct	singletons_failed_pct	with mate mapped to a different chr_passed	with mate mapped to a different chr_failed	with mate mapped to a different chr (mapQ >= 5)_passed	with mate mapped to a different chr (mapQ >= 5)_failed	flagstat_total
+SRR935172_mini	46891	0	1438	0	0	0	939	0	46891	0	100.0	nan	45453	0	22779	0	22674	0	45324	0	99.72	nan	45324	0	129	0	0.28	nan	0	0	0	0	46891
+SRR935173_mini	39445	0	1364	0	0	0	456	0	39445	0	100.0	nan	38081	0	19103	0	18978	0	37918	0	99.57	nan	37918	0	163	0	0.43	nan	0	0	0	0	39445
+SRR935174_mini	40379	0	1070	0	0	0	1086	0	40379	0	100.0	nan	39309	0	19705	0	19604	0	39194	0	99.71	nan	39194	0	115	0	0.29	nan	0	0	0	0	40379
+SRR935175_mini	49431	0	1939	0	0	0	1038	0	49431	0	100.0	nan	47492	0	23809	0	23683	0	47306	0	99.61	nan	47306	0	186	0	0.39	nan	0	0	0	0	49431
+SRR935176_mini	45962	0	1364	0	0	0	944	0	45962	0	100.0	nan	44598	0	22354	0	22244	0	44452	0	99.67	nan	44452	0	146	0	0.33	nan	0	0	0	0	45962
+SRR935177_mini	45990	0	1076	0	0	0	1318	0	45990	0	100.0	nan	44914	0	22515	0	22399	0	44766	0	99.67	nan	44766	0	148	0	0.33	nan	0	0	0	0	45990
+SRR935178_mini	61230	0	2114	0	0	0	1325	0	61230	0	100.0	nan	59116	0	29602	0	29514	0	58990	0	99.79	nan	58990	0	126	0	0.21	nan	0	0	0	0	61230
+SRR935179_mini	52374	0	1403	0	0	0	920	0	52374	0	100.0	nan	50971	0	25540	0	25431	0	50826	0	99.72	nan	50826	0	145	0	0.28	nan	0	0	0	0	52374
+SRR935180_mini	47170	0	1195	0	0	0	1051	0	47170	0	100.0	nan	45975	0	23037	0	22938	0	45854	0	99.74	nan	45854	0	121	0	0.26	nan	0	0	0	0	47170

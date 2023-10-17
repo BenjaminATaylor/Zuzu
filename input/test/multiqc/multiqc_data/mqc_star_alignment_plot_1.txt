@@ -1,0 +1,10 @@
+Sample	Uniquely mapped	Mapped to multiple loci	Mapped to too many loci	Unmapped: too short	Unmapped: other
+SRR935172_mini	22428.0	363.0	0.0	4293.0	3.0
+SRR935173_mini	18765.0	357.0	1.0	6034.0	3.0
+SRR935174_mini	19402.0	310.0	2.0	3504.0	2.0
+SRR935175_mini	23392.0	447.0	1.0	5098.0	6.0
+SRR935176_mini	21976.0	396.0	1.0	4819.0	0.0
+SRR935177_mini	22201.0	330.0	6.0	3141.0	3.0
+SRR935178_mini	29155.0	466.0	3.0	6303.0	4.0
+SRR935179_mini	25138.0	420.0	1.0	6599.0	3.0
+SRR935180_mini	22712.0	336.0	1.0	2885.0	3.0

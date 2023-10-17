@@ -1,0 +1,19 @@
+Sample	Filename	File type	Encoding	Total Sequences	Sequences flagged as poor quality	Sequence length	%GC	total_deduplicated_percentage	avg_sequence_length	median_sequence_length	basic_statistics	per_base_sequence_quality	per_tile_sequence_quality	per_sequence_quality_scores	per_base_sequence_content	per_sequence_gc_content	per_base_n_content	sequence_length_distribution	sequence_duplication_levels	overrepresented_sequences	adapter_content
+SRR935172_mini_1	SRR935172_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	33213.0	0.0	100.0	40.0	86.69797970674134	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935172_mini_2	SRR935172_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	33213.0	0.0	100.0	41.0	89.0615120585313	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935173_mini_1	SRR935173_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	30819.0	0.0	100.0	40.0	89.72062688601187	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935173_mini_2	SRR935173_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	30819.0	0.0	100.0	40.0	91.21970213180181	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935174_mini_1	SRR935174_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	27078.0	0.0	100.0	35.0	89.01691410000738	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	fail	pass
+SRR935174_mini_2	SRR935174_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	27078.0	0.0	100.0	35.0	90.85604549819041	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935175_mini_1	SRR935175_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	35785.0	0.0	100.0	39.0	86.43286293139583	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935175_mini_2	SRR935175_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	35785.0	0.0	100.0	40.0	88.54827441665503	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935176_mini_1	SRR935176_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	32184.0	0.0	100.0	39.0	88.8174248073577	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935176_mini_2	SRR935176_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	32184.0	0.0	100.0	39.0	90.43002734277901	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935177_mini_1	SRR935177_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	29451.0	0.0	100.0	34.0	88.8900207123697	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935177_mini_2	SRR935177_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	29451.0	0.0	100.0	34.0	90.6454789311059	100.0	100	pass	pass	fail	pass	warn	pass	pass	pass	pass	warn	pass
+SRR935178_mini_1	SRR935178_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	41495.0	0.0	100.0	38.0	89.35775394625858	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935178_mini_2	SRR935178_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	41495.0	0.0	100.0	38.0	91.33148572117122	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935179_mini_1	SRR935179_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	37479.0	0.0	100.0	38.0	89.73825342191627	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935179_mini_2	SRR935179_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	37479.0	0.0	100.0	39.0	91.0589930361002	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass
+SRR935180_mini_1	SRR935180_mini_1.gz	Conventional base calls	Sanger / Illumina 1.9	29962.0	0.0	100.0	37.0	89.34316801281624	100.0	100	pass	pass	fail	pass	fail	warn	pass	pass	pass	warn	pass
+SRR935180_mini_2	SRR935180_mini_2.gz	Conventional base calls	Sanger / Illumina 1.9	29962.0	0.0	100.0	37.0	91.38575529003404	100.0	100	pass	pass	fail	pass	warn	warn	pass	pass	pass	warn	pass

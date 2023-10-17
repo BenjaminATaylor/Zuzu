@@ -1,0 +1,190 @@
+Module	Section	Sample Name	Source
+Picard	DuplicationMetrics	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935172_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935174_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935173_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935176_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935177_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935179_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935180_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935178_mini.markdup.sorted.MarkDuplicates.metrics.txt
+Picard	DuplicationMetrics	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/picard/markduplicates/SRR935175_mini.markdup.sorted.MarkDuplicates.metrics.txt
+QualiMap	rna_genome_results	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935173_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935172_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935179_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935178_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935175_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935177_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935176_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935180_mini/rnaseq_qc_results.txt
+QualiMap	rna_genome_results	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935174_mini/rnaseq_qc_results.txt
+QualiMap	rna_coverage_histogram	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935173_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935172_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935179_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935178_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935175_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935177_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935176_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935180_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+QualiMap	rna_coverage_histogram	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/qualimap/SRR935174_mini/raw_data_qualimapReport/coverage_profile_along_genes_(total).txt
+RSeQC	read_distribution	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935180_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935173_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935176_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935174_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935172_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935178_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935175_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935179_mini.read_distribution.txt
+RSeQC	read_distribution	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_distribution/SRR935177_mini.read_distribution.txt
+RSeQC	inner_distance	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935174_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935176_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935173_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935178_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935172_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935175_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935177_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935180_mini.inner_distance_freq.txt
+RSeQC	inner_distance	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/inner_distance/SRR935179_mini.inner_distance_freq.txt
+RSeQC	read_duplication	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935180_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935172_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935176_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935175_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935178_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935173_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935174_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935179_mini.pos.DupRate.xls
+RSeQC	read_duplication	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/read_duplication/SRR935177_mini.pos.DupRate.xls
+RSeQC	junction_annotation	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935175_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935177_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935174_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935180_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935178_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935176_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935173_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935179_mini.junction_annotation.log
+RSeQC	junction_annotation	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_annotation/SRR935172_mini.junction_annotation.log
+RSeQC	junction_saturation	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935174_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935180_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935175_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935173_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935172_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935178_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935177_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935176_mini.junctionSaturation_plot.r
+RSeQC	junction_saturation	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/junction_saturation/SRR935179_mini.junctionSaturation_plot.r
+RSeQC	infer_experiment	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935176_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935172_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935173_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935177_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935180_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935179_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935178_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935175_mini.infer_experiment.txt
+RSeQC	infer_experiment	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/infer_experiment/SRR935174_mini.infer_experiment.txt
+RSeQC	bam_stat	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935174_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935173_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935177_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935180_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935175_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935178_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935179_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935176_mini.bam_stat.txt
+RSeQC	bam_stat	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/rseqc/bam_stat/SRR935172_mini.bam_stat.txt
+Samtools	stats	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935178_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935172_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935173_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935180_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935176_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935174_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935175_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935177_mini.markdup.sorted.bam.stats
+Samtools	stats	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/stats/SRR935179_mini.markdup.sorted.bam.stats
+Samtools	flagstat	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935177_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935172_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935173_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935176_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935179_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935178_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935174_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935180_mini.markdup.sorted.bam.flagstat
+Samtools	flagstat	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/flagstat/SRR935175_mini.markdup.sorted.bam.flagstat
+Samtools	idxstats	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935172_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935176_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935175_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935180_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935178_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935174_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935173_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935179_mini.markdup.sorted.bam.idxstats
+Samtools	idxstats	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/samtools/idxstats/SRR935177_mini.markdup.sorted.bam.idxstats
+SortMeRNA	all_sections	SRR935172_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935172_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935175_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935175_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935180_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935180_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935174_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935174_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935179_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935179_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935173_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935173_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935177_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935177_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935176_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935176_mini.sortmerna.log
+SortMeRNA	all_sections	SRR935178_mini.sortmerna	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/sortmerna/SRR935178_mini.sortmerna.log
+STAR	SummaryLog	SRR935178_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935178_mini.Log.final.out
+STAR	SummaryLog	SRR935176_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935176_mini.Log.final.out
+STAR	SummaryLog	SRR935172_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935172_mini.Log.final.out
+STAR	SummaryLog	SRR935175_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935175_mini.Log.final.out
+STAR	SummaryLog	SRR935173_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935173_mini.Log.final.out
+STAR	SummaryLog	SRR935177_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935177_mini.Log.final.out
+STAR	SummaryLog	SRR935179_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935179_mini.Log.final.out
+STAR	SummaryLog	SRR935180_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935180_mini.Log.final.out
+STAR	SummaryLog	SRR935174_mini	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/star/SRR935174_mini.Log.final.out
+FastQC (raw)	all_sections	SRR935176_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935176_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935175_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935175_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935180_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935180_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935176_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935176_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935174_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935174_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935173_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935173_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935178_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935178_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935172_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935172_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935172_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935172_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935177_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935177_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935178_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935178_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935177_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935177_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935179_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935179_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935180_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935180_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935173_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935173_mini_2_fastqc.zip
+FastQC (raw)	all_sections	SRR935174_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935174_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935179_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935179_mini_1_fastqc.zip
+FastQC (raw)	all_sections	SRR935175_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/raw/SRR935175_mini_1_fastqc.zip
+Cutadapt	all_sections	SRR935174_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935174_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935180_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935180_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935174_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935174_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935179_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935179_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935176_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935176_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935173_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935173_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935180_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935180_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935178_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935178_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935172_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935172_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935178_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935178_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935173_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935173_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935172_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935172_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935177_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935177_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935175_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935175_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935177_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935177_mini_2.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935179_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935179_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935176_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935176_mini_1.fastq.gz_trimming_report.txt
+Cutadapt	all_sections	SRR935175_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/trim_log/SRR935175_mini_1.fastq.gz_trimming_report.txt
+FastQC (trimmed)	all_sections	SRR935174_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935174_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935175_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935175_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935180_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935180_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935172_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935172_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935172_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935172_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935180_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935180_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935178_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935178_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935177_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935177_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935174_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935174_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935179_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935179_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935178_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935178_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935176_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935176_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935176_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935176_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935173_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935173_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935177_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935177_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935173_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935173_mini_1_val_1_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935175_mini_2	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935175_mini_2_val_2_fastqc.zip
+FastQC (trimmed)	all_sections	SRR935179_mini_1	/depot/bharpur/data/projects/taylor/HFSP/testdata/work/49/f6a2cef2de22435dcc32327c642ded/fastqc/trim/SRR935179_mini_1_val_1_fastqc.zip

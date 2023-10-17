@@ -1,0 +1,10 @@
+sample,fastq_1,fastq_2,strandedness
+SRR935175_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935175_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935175_mini_2.fastq,auto
+SRR935179_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935179_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935179_mini_2.fastq,auto
+SRR935180_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935180_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935180_mini_2.fastq,auto
+SRR935178_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935178_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935178_mini_2.fastq,auto
+SRR935173_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935173_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935173_mini_2.fastq,auto
+SRR935176_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935176_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935176_mini_2.fastq,auto
+SRR935172_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935172_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935172_mini_2.fastq,auto
+SRR935174_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935174_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935174_mini_2.fastq,auto
+SRR935177_mini,/Users/benjamin/Repositories/Riker/testdata/SRR935177_mini_1.fastq,/Users/benjamin/Repositories/Riker/testdata/SRR935177_mini_2.fastq,auto

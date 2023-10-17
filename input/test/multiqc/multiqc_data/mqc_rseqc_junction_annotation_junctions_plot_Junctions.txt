@@ -1,0 +1,10 @@
+Sample	Known Splicing Junctions	Partial Novel Splicing Junctions	Novel Splicing Junctions
+SRR935172_mini	4665.0	88.0	80.0
+SRR935173_mini	4186.0	67.0	81.0
+SRR935174_mini	4077.0	65.0	73.0
+SRR935175_mini	4529.0	104.0	91.0
+SRR935176_mini	4479.0	100.0	84.0
+SRR935177_mini	4315.0	86.0	79.0
+SRR935178_mini	4804.0	103.0	111.0
+SRR935179_mini	4568.0	109.0	99.0
+SRR935180_mini	4106.0	82.0	81.0

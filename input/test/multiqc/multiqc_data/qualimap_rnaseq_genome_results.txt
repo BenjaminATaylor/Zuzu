@@ -1,0 +1,10 @@
+Sample	bam_file	reads_aligned	total_alignments	non_unique_alignments	reads_aligned_genes	ambiguous_alignments	not_aligned	5_3_bias	reads_aligned_exonic	reads_aligned_intronic	reads_aligned_intergenic	reads_aligned_overlapping_exon
+SRR935172_mini	SRR935172_mini.markdup.sorted.bam	22662.0	46891.0	1874.0	31808.0	10.0	0.0	9.64	31808.0	5936.0	5958.0	1386.0
+SRR935173_mini	SRR935173_mini.markdup.sorted.bam	18959.0	39445.0	1842.0	26792.0	12.0	0.0	4.28	26792.0	4912.0	4853.0	1254.0
+SRR935174_mini	SRR935174_mini.markdup.sorted.bam	19597.0	40379.0	1461.0	24918.0	187.0	0.0		24918.0	5782.0	6358.0	1323.0
+SRR935175_mini	SRR935175_mini.markdup.sorted.bam	23653.0	49431.0	2435.0	32351.0	16.0	0.0	3.4	32351.0	6991.0	6248.0	1557.0
+SRR935176_mini	SRR935176_mini.markdup.sorted.bam	22226.0	45962.0	1868.0	30303.0	6.0	0.0	5.78	30303.0	6860.0	5826.0	1634.0
+SRR935177_mini	SRR935177_mini.markdup.sorted.bam	22383.0	45990.0	1577.0	27808.0	198.0	0.0	8.93	27808.0	7312.0	7559.0	1723.0
+SRR935178_mini	SRR935178_mini.markdup.sorted.bam	29495.0	61230.0	2609.0	39330.0	18.0	0.0	5.54	39330.0	9308.0	8456.0	1992.0
+SRR935179_mini	SRR935179_mini.markdup.sorted.bam	25413.0	52374.0	2001.0	34583.0	21.0	0.0	4.9	34583.0	8058.0	6753.0	1794.0
+SRR935180_mini	SRR935180_mini.markdup.sorted.bam	22927.0	47170.0	1708.0	28628.0	18.0	0.0	23.3	28628.0	7988.0	7608.0	1748.0

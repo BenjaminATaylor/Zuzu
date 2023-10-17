@@ -1,0 +1,27 @@
+### Pipeline plan:
+
+## Simple version: work with a single test set and produce certain reproducibility metrics
+
+# Input
+A dataframe or matrix containing raw gene counts, from nf-core RNAseq
+A sample sheet giving sample IDs and values for a single binary categorical variables
+(optionally) A specification of the reference condition (important for DE analyses)
+
+# Process
+
+1. Check that the dataframe and matrix are valid and conform
+Do the sample names in the two match?
+Is there a condition, is it binary and categorical, and does it match the supplied reference level?
+Are there non-numeric values within the counts matrix?
+
+2. Clean the counts matrix. This has to be well-standardised so that we have comparable data before moving onto the next steps
+Coerce all counts to integers
+Cut low counts, two ways: simple per-sample cut and per-group cut (does at least one group meet minimum) (GIVE THE OPTION TO SKIP THIS)
+Generate output reports: how many genes cut by each method, how many remain
+
+3. Quality control. Generate some output plots, and perhaps a text report? Can this auto-flag outliers?
+PCA/MDS with treatments labeled (can we also label sources of technical variation? Lanes?)
+Cook's distances plot
+pheatmap of sample distances
+
+4. DESeq2 initial analysis
