@@ -1,1 +1,3 @@
-image: nfcore/gitpod:latest
+image: 
+  nfcore/gitpod:2.10
+  r-base:4.3.1
