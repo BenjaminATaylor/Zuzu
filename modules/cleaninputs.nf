@@ -1,4 +1,4 @@
-process CHECKINPUTS {
+process CLEANINPUTS {
 
     conda 'r-tidyverse-1.3.1'
 
@@ -8,7 +8,7 @@ process CHECKINPUTS {
     val reflevel
 
     output:
-    tuple path("samplesheet.csv"), path("countsframe.csv")
+    tuple path("samplesheet.csv"), path("countsframe_clean.csv")
 
     script:
     """
@@ -29,8 +29,19 @@ process CHECKINPUTS {
     stopifnot("$reflevel" %in% levels(as.factor(samplesheet\$phenotype)))
     samplesheet\$phenotype = as.factor(samplesheet\$phenotype) %>% relevel(ref = "$reflevel")
     stopifnot(length(levels(samplesheet\$phenotype))==2)
-    
+
+    # Round all values to integers
+    countsframe = round(countsframe)
+
+    # Now clean for low counts. Require mean per-sample counts greater than 5 in at least one group
+    checkmeans = function(x){
+    thesesamples = subset(samplesheet, phenotype == x)\$sample
+    rowMeans(countsframe[,thesesamples])>5
+    }
+    keeprows = row.names(countsframe)[rowSums(sapply(levels(samplesheet\$phenotype),checkmeans))>0]
+    countsframe.clean = countsframe[keeprows,]
+
     write.csv(samplesheet,"samplesheet.csv", row.names = FALSE)
-    write.csv(countsframe,"countsframe.csv")
+    write.csv(countsframe.clean,"countsframe_clean.csv")
     """
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 // Modules to include
-include { CHECKINPUTS } from './modules/checkinputs.nf'
+include { CLEANINPUTS } from './modules/cleaninputs.nf'
 //exit 1, 'DEBUG'
 
 // Validate inputs
@@ -13,7 +13,23 @@ println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
 
+process QUALITYCONTROL {
+
+  input: 
+  tuple path(samplesheet), path(countsframe)
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+
+
+
+  """
+
+}
+
 workflow {
-  CHECKINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
+  CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
     .view()
 }
