@@ -1,4 +1,5 @@
 nextflow run main.nf \
     --samplesheet "input/test/samplesheet_phenotype.csv" \
     --countsframe "input/test/salmon.merged.gene_counts.tsv" \
-    --reflevel "nurse"
+    --reflevel "nurse" \
+    --resume
