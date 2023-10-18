@@ -15,8 +15,13 @@ println("Reference level: " + ch_reflevel)
 
 process QUALITYCONTROL {
 
+  publishDir "$params.outdir"
+
   input: 
   tuple path(samplesheet), path(countsframe)
+
+  output:
+  path "QC_plots.pdf"
 
   script:
   """
