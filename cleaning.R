@@ -113,3 +113,70 @@ ggsave(ggout,
        width =  40, height = 40, units = "cm")
 
 
+
+##### DESeq2 #####
+
+# Time for some analysis. The first step here is to perform a simple DESeq2 differential expression analysis.
+# Outputs required: lists of DE genes with and without a modest LFC threshold of 1 (i.e. doubling of expression)
+
+#generate model
+dds = DESeqDataSetFromMatrix(countData = countsframe.clean,
+                             colData = samplesheet,
+                             design = as.formula(~phenotype))
+# Run the default analysis for DESeq2
+dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+res.LFC0 = results(dds.deg)
+res.LFC1 = results(dds.deg,lfcThreshold = 1)
+
+save(dds.deg, file = "dds_deg.RData")
+foo=load("dds_deg.RData")
+bar=get(foo)
+
+
+
+subset(res.LFC0, padj<0.05)
+subset(res.LFC1, padj<0.05)
+
+#Alright, at this point we need better testing data
+
+### In the meantime set up some stuff from Li et al
+
+## Create a permuted dataset (sample labels are permuted at random)
+set.seed(123)
+permcols = sample(colnames(countsframe.clean),replace = FALSE)
+countsframe.perm = countsframe.clean %>% `colnames<-`(permcols)
+samplesheet.perm = samplesheet[match(samplesheet$sample, permcols),]
+
+# Rerun DESeq2
+#generate model
+dds.perm = DESeqDataSetFromMatrix(countData = countsframe.perm,
+                             colData = samplesheet.perm,
+                             design = as.formula(~phenotype))
+# Run the default analysis for DESeq2
+dds.deg.perm = DESeq(dds.perm, fitType = "parametric", betaPrior = FALSE)
+res.LFC0.perm = results(dds.deg.perm)
+res.LFC1.perm = results(dds.deg.perm,lfcThreshold = 1)
+
+subset(res.LFC0.perm, padj<0.05)
+subset(res.LFC1.perm, padj<0.05)
+
+# In nextflow, what we'd want to do is submit this chunk 50 times and then channel them all back to some downstream process that takes the mean of the output numbers of DEGs
+
+
+## 'Permuted' and 'semi-synthetic' datasets used by Li et al
+# Permuted: 
+#   Randomly re-order column labels while keeping gene counts equal 
+#   They did this 1000 times
+# Semi-synthetic: 
+#   Run DE analysis on dataset and single out genes that remain after applying very conservative FDR threshold (0.0001 %)
+#   Keep half of these genes original, randomly permute counts for the other half and all other genes
+#   For some analyses, these datasets were then downsampled
+#   They repeated this one 50 times
+### Then here's what they did with these datasets:
+## First: Compare number of DEGs identified in original dataset and in permuted dataset for each method
+
+## Second: FDP = proportion of false positives among all discoveries.
+# Using semi-synthetic dataset, they defined true DEGs as true positive and all remaining as true negatives
+# Then estimated FDR as the average FDP over 50 simulated datasets
+## Third: Power = here, the poportion of true DEGs identified as DEGs
+# Aagin, calculated with semi-synthetic dataset and averaged across 50 datasets
