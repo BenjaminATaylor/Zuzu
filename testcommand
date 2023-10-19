@@ -3,5 +3,5 @@ nextflow run main.nf \
     --countsframe "input/test/salmon.merged.gene_counts.tsv" \
     --reflevel "nurse" \
     --outdir "output" \
-    --nperms 5 \
-    --resume
+    --nperms 3 \
+    -resume

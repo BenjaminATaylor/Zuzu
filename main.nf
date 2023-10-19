@@ -18,7 +18,7 @@ println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
 
-process DESEQ_ORIGINAL{
+process DESEQ_BASIC{
 
   input: 
   tuple path(samplesheet), path(countsframe) 
@@ -45,20 +45,19 @@ process DESEQ_ORIGINAL{
   """
 }
 
-process DESEQ_PERMUTE{
+process DATA_PERMUTE{
 
   input: 
   tuple path(samplesheet), path(countsframe)
   val x
 
   output:
-  path "dds_deg_permute.RData"
+  tuple path("samplesheet_perm.csv"), path("countsframe_perm.csv")
 
   script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse")
-  library("DESeq2")
 
   #print(paste0("DEBUG: ", "$samplesheet", " ", "$x"))
 
@@ -71,27 +70,80 @@ process DESEQ_PERMUTE{
   countsframe.perm = countsframe.clean %>% `colnames<-`(permcols)
   samplesheet.perm = samplesheet[match(samplesheet\$sample, permcols),]
 
-  #generate model
-  dds.perm = DESeqDataSetFromMatrix(countData = countsframe.perm,
-                                    colData = samplesheet.perm,
-                                    design = as.formula(~phenotype))
-  # Run the default analysis for DESeq2
-  dds.deg.perm = DESeq(dds.perm, fitType = "parametric", betaPrior = FALSE)
+  write.csv(samplesheet.perm,"samplesheet_perm.csv", row.names = FALSE)
+  write.csv(countsframe.perm,"countsframe_perm.csv")
 
-  # Save the *number* of DEGs as output (that's all we care about for now, I think?)
-  save(dds.deg.perm, file = "dds_deg_permute.RData")
   """
 }
+
+process DESEQ_PERMUTE{
+
+  input: 
+  tuple path(samplesheet), path(countsframe) 
+
+  output:
+  path "dds_deg.RData"
+  path "nDEGs.RData", emit: nDEGs
+
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+  library("DESeq2")
+
+  samplesheet = read.csv("$samplesheet")
+  countsframe.clean = read.csv("$countsframe", row.names = 1)
+
+  #generate model
+  dds = DESeqDataSetFromMatrix(countData = countsframe.clean,
+                               colData = samplesheet,
+                               design = as.formula(~phenotype))
+  # Run the default analysis for DESeq2
+  dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+  nDEGs = nrow(subset(results(dds.deg),padj<0.05))
+  save(nDEGs,file = "nDEGs.RData")
+  save(dds.deg, file = "dds_deg.RData")
+  """
+}
+
+process DESEQ_PERMUTE_COLLECT{
+
+  //debug true
+
+  input: 
+  val nDEGs_list
+
+  output:
+  tuple path("nDEGs_list.RData"), val("DESeq2")
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+
+  objlist = str_remove_all("$nDEGs_list","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
+  permdeglist = sapply(objlist, function(x) get(load(x))) %>% unname()
+
+  save(permdeglist, file="nDEGs_list.RData")
+  """
+}
+
+
 
 
 
 workflow {
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
   QUALITYCONTROL(CLEANINPUTS.out)
-  DESEQ_ORIGINAL(CLEANINPUTS.out)
+  DESEQ_BASIC(CLEANINPUTS.out)
 
   perms = Channel.from(1..params.nperms)
-  DESEQ_PERMUTE(CLEANINPUTS.out, perms)
+  DATA_PERMUTE(CLEANINPUTS.out, perms) |
+  DESEQ_PERMUTE 
 
-  DESEQ_PERMUTE.out.view()
+  DESEQ_PERMUTE.out.nDEGs.collect() |
+  DESEQ_PERMUTE_COLLECT 
+  
+  DESEQ_PERMUTE_COLLECT.out.view()
 }
