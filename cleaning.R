@@ -160,7 +160,42 @@ res.LFC1.perm = results(dds.deg.perm,lfcThreshold = 1)
 subset(res.LFC0.perm, padj<0.05)
 subset(res.LFC1.perm, padj<0.05)
 
-# In nextflow, what we'd want to do is submit this chunk 50 times and then channel them all back to some downstream process that takes the mean of the output numbers of DEGs
+
+### Semi-synthesise Li style
+
+## Pseudocode:
+
+# Run DE analysis and generate a list of genes to take as true positive. We can take this directly from the orig process
+# Select a random half of these genes to keep steady, and note down those genes. Permute all other genes, 50 times
+# For each permutation, re-run DESeq2. Then compare to the list of true positive to produce metrics: Power, FDP and ROC AUC
+
+DEBUG=TRUE
+
+# One iteration
+truedegs = row.names(subset(results(dds.deg,alpha = 0.000001),padj<0.05))
+keepnum = round(length(truedegs)/2)
+if(DEBUG){keepnum = 100 ; truedegs = sample(row.names(results(dds.deg)),200) }#DEBUG 
+keepdegs = sample(truedegs, size = keepnum, replace = FALSE)
+
+# Permute everything...
+permuterow = function(x){ sample(x, size = ncol(countsframe.clean)) }
+quasi.frame = apply(X = countsframe.clean, MARGIN = 1, FUN = permuterow) %>% 
+  t() %>% 
+  data.frame() %>% 
+  `colnames<-`(colnames(countsframe.clean))
+# Then restore true counts for the 'true' DEGs
+quasi.frame[keepdegs,] = countsframe.clean[keepdegs,]
+
+# Then re-run DESeq2 
+#generate model
+dds = DESeqDataSetFromMatrix(countData = quasi.frame,
+                             colData = samplesheet,
+                             design = as.formula(~phenotype))
+# Run the default analysis for DESeq2
+dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+#save(dds.deg, file = "dds_deg.RData")
+subset(results(dds.deg.quasi),padj<0.05)
+
 
 
 ## 'Permuted' and 'semi-synthetic' datasets used by Li et al
@@ -180,3 +215,5 @@ subset(res.LFC1.perm, padj<0.05)
 # Then estimated FDR as the average FDP over 50 simulated datasets
 ## Third: Power = here, the poportion of true DEGs identified as DEGs
 # Aagin, calculated with semi-synthetic dataset and averaged across 50 datasets
+
+
