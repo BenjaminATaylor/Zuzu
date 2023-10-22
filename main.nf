@@ -101,7 +101,7 @@ process EDGER_PERMUTE_COLLECT{
   val nDEGs_list
 
   output:
-  tuple path("nDEGs_list.RData"), val("edgeR")
+  path "edger_nDEGs_list.RData"
 
   script:
   """
@@ -111,11 +111,15 @@ process EDGER_PERMUTE_COLLECT{
   objlist = str_remove_all("$nDEGs_list","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
   permdeglist = sapply(objlist, function(x) get(load(x))) %>% unname()
 
-  save(permdeglist, file="nDEGs_list.RData")
+  save(permdeglist, file="edger_nDEGs_list.RData")
   """
 }
 
 process PERMUTE_PLOTS{
+
+  publishDir "$params.outdir"
+
+  debug true
 
   input:
   path deseq_table
@@ -123,11 +127,40 @@ process PERMUTE_PLOTS{
   path edger_table
   path edger_perms
 
+  output:
+  path "permute_plot.pdf"
+
   """
   #!/usr/bin/env Rscript
   library("tidyverse")
+  library("DESeq2")
 
-  
+  # DESeq inputs
+  deseq.res = get(load("$deseq_table"))
+  deseq.table = results(deseq.res)
+  deseq.ndegs = nrow(subset(deseq.table, padj<0.05))
+  deseq.perms = get(load("$deseq_perms"))
+  deseq.permute.input = data.frame( method = "DESeq2", 
+                                    nDEGs = deseq.ndegs, 
+                                    permutes = deseq.perms)
+
+  # edgeR inputs
+  edger.table = read.csv("$edger_table", row.names = 1)
+  edger.ndegs = nrow(subset(edger.table, padj<0.05))
+  edger.perms = get(load("$edger_perms"))
+  edger.permute.input =  data.frame(method = "edgeR", 
+                                    nDEGs = edger.ndegs, 
+                                    permutes = edger.perms)
+  permuteplot.input = rbind(deseq.permute.input,edger.permute.input)
+
+  gg.permute = ggplot(permuteplot.input, aes(x = method, y = permutes)) +
+      geom_point() +
+      geom_point(aes(x = method, y = nDEGs), color = "red")
+
+  ggsave(gg.permute, 
+       filename = "permute_plot.pdf",
+       device = "pdf", bg = "transparent",
+       width =  20, height = 20, units = "cm")
 
   """
 
@@ -157,7 +190,13 @@ workflow {
   .collect() |
   EDGER_PERMUTE_COLLECT 
   // Combine outputs and plot
-  
+  PERMUTE_PLOTS(
+    DESEQ_BASIC.out,
+    DESEQ_PERMUTE_COLLECT.out,
+    EDGER_BASIC.out,
+    EDGER_PERMUTE_COLLECT.out
+  )
+
   
   DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 

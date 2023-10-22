@@ -6,7 +6,7 @@ process DESEQ_PERMUTE_COLLECT{
   val nDEGs_list
 
   output:
-  tuple path("nDEGs_list.RData"), val("DESeq2")
+  path "deseq_nDEGs_list.RData"
 
   script:
   """
@@ -16,6 +16,6 @@ process DESEQ_PERMUTE_COLLECT{
   objlist = str_remove_all("$nDEGs_list","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
   permdeglist = sapply(objlist, function(x) get(load(x))) %>% unname()
 
-  save(permdeglist, file="nDEGs_list.RData")
+  save(permdeglist, file="deseq_nDEGs_list.RData")
   """
 }
