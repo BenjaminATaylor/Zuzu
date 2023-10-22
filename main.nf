@@ -37,6 +37,7 @@ process EDGER_BASIC{
   """
   #!/usr/bin/env Rscript
   library("edgeR") 
+  library("tidyverse")
 
   # Input data
   samplesheet = read.csv("$samplesheet")
@@ -50,10 +51,86 @@ process EDGER_BASIC{
   edge.fit = glmQLFit(dds.edge.est,design.edge)
   edge.qlf = glmQLFTest(edge.fit,coef=2)
 
-  # Tabular output (rather than topTags, which only gives the most highly-DE results)
-  edge.out = edge.qlf\$table
+  # Tabular output (perform FDR correction directly rather than relying on topTags to do it for us)
+  edge.out = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
   write.csv(edge.out, row.names = T, file="edger_table.csv")
   """
+}
+
+process EDGER_PERMUTE{
+
+  input: 
+  tuple path(samplesheet), path(countsframe) 
+
+  output:
+  path "edger_table.csv"
+  path "nDEGs.RData", emit: nDEGs
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("edgeR") 
+  library("tidyverse")
+
+  # Input data
+  samplesheet = read.csv("$samplesheet")
+  countsframe.clean = read.csv("$countsframe", row.names = 1)
+
+  # Basic edgeR workflow, taken from the documentation
+  dds.edge = DGEList(counts=countsframe.clean,group=samplesheet\$phenotype)
+  dds.edge = normLibSizes(dds.edge)
+  design.edge = model.matrix(~samplesheet\$phenotype)
+  dds.edge.est = estimateDisp(dds.edge,design.edge)
+  edge.fit = glmQLFit(dds.edge.est,design.edge)
+  edge.qlf = glmQLFTest(edge.fit,coef=2)
+
+  # Tabular output (perform FDR correction directly rather than relying on topTags to do it for us)
+  edge.out = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
+
+  nDEGs = nrow(subset(edge.out,padj<0.05))
+  save(nDEGs,file = "nDEGs.RData")
+  write.csv(edge.out, file="edger_table.csv", row.names = T)
+  """
+}
+
+process EDGER_PERMUTE_COLLECT{
+
+  //debug true
+
+  input: 
+  val nDEGs_list
+
+  output:
+  tuple path("nDEGs_list.RData"), val("edgeR")
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+
+  objlist = str_remove_all("$nDEGs_list","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
+  permdeglist = sapply(objlist, function(x) get(load(x))) %>% unname()
+
+  save(permdeglist, file="nDEGs_list.RData")
+  """
+}
+
+process PERMUTE_PLOTS{
+
+  input:
+  path deseq_table
+  path deseq_perms
+  path edger_table
+  path edger_perms
+
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+
+  
+
+  """
+
 }
 
 
@@ -69,13 +146,18 @@ workflow {
   //Permutation analysis with no true signal
   perms = Channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
+  // For DESeq
   DESEQ_PERMUTE(DATA_PERMUTE.out)
-  DESEQ_PERMUTE.out.nDEGs.view()
-
-
   DESEQ_PERMUTE.out.nDEGs
   .collect() |
   DESEQ_PERMUTE_COLLECT 
+  // For edgeR
+  EDGER_PERMUTE(DATA_PERMUTE.out)
+  EDGER_PERMUTE.out.nDEGs
+  .collect() |
+  EDGER_PERMUTE_COLLECT 
+  // Combine outputs and plot
+  
   
   DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 
@@ -84,6 +166,6 @@ workflow {
   .collect() |
   DESEQ_QUASI_COLLECT
 
-  DESEQ_QUASI_COLLECT.out.view()
+  //DESEQ_QUASI_COLLECT.out.view()
 
 }
