@@ -136,7 +136,7 @@ process DATA_QUASI{
   val x
 
   output:
-  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData")
+  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData"), path(samplesheet)
 
   script:
   """
@@ -186,6 +186,85 @@ process DATA_QUASI{
   """
 }
 
+process DESEQ_QUASI {
+  
+  input: 
+  tuple path(quasiframe), path(truedegs), path(samplesheet)
+
+  output:
+  path 'outframe.csv'
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+  library("DESeq2")
+  library("pROC")
+
+  DEBUG=TRUE
+
+  samplesheet = read.csv("$samplesheet")
+  quasi.frame = read.csv("$quasiframe", row.names = 1)
+  truedegs = get(load("$truedegs"))
+
+  #generate model
+  dds = DESeqDataSetFromMatrix(countData = quasi.frame,
+                               colData = samplesheet,
+                               design = as.formula(~phenotype))
+  # Run the default analysis for DESeq2
+  dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+
+  # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
+  quasidegs = row.names(subset(results(dds.deg.quasi),padj<0.05))
+  if(DEBUG){quasidegs = sample(row.names(results(dds.deg.quasi)),200)}
+  #if(DEBUG){quasidegs = sample(truedegs, 70)}
+  power = length(which(truedegs %in% quasidegs))/length(truedegs)
+
+  # 2. FDP: the proportion of all DEGs that are false positives
+  FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
+
+  # 3. ROC AUC
+  allgenes = row.names(results(dds.deg.quasi))
+  truelabels = as.numeric(allgenes %in% truedegs)
+  quasilabels = as.numeric(allgenes %in% quasidegs)
+  AUC = auc(truelabels, quasilabels)
+  # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
+  normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+
+  # Save outputs
+  outframe = data.frame(power = power, FDP = FDP, normAUC = normAUC)
+  write.csv(outframe, file="outframe.csv", row.names = FALSE)
+
+  """
+
+}
+
+process DESEQ_QUASI_COLLECT{
+
+  debug true
+
+  input: 
+  val 'quasiout'
+
+  output:
+  tuple path("quasi_outframe.csv"), val("DESeq2")
+
+  script:
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse")
+
+  # print("$quasiout")
+
+  objlist = str_remove_all("$quasiout","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
+  quasi.outframe = sapply(objlist, function(x) read.csv(x)) %>% 
+    t() %>% `rownames<-`(NULL) %>% 
+    data.frame() %>% mutate_all(as.numeric)
+
+  write.csv(quasi.outframe, file = "quasi_outframe.csv", row.names = FALSE)
+  """
+}
+
 
 workflow {
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
@@ -196,12 +275,17 @@ workflow {
   DATA_PERMUTE(CLEANINPUTS.out, perms) |
   DESEQ_PERMUTE 
 
-  DESEQ_PERMUTE.out.nDEGs.collect() |
+  DESEQ_PERMUTE.out.nDEGs
+  .collect() |
   DESEQ_PERMUTE_COLLECT 
   
-  DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms)
+  DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms) |
+  DESEQ_QUASI 
 
-  
-  DATA_QUASI.out.view()
+  DESEQ_QUASI.out
+  .collect() |
+  DESEQ_QUASI_COLLECT
+
+  DESEQ_QUASI_COLLECT.out.view()
 
 }

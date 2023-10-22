@@ -194,9 +194,26 @@ dds = DESeqDataSetFromMatrix(countData = quasi.frame,
 # Run the default analysis for DESeq2
 dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
 #save(dds.deg, file = "dds_deg.RData")
-subset(results(dds.deg.quasi),padj<0.05)
 
+# Now we can generate some parameters of interest
 
+# 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
+quasidegs = row.names(subset(results(dds.deg.quasi),padj<0.05))
+if(DEBUG){quasidegs = sample(row.names(results(dds.deg.quasi)),200)}
+if(DEBUG){quasidegs = sample(keepdegs, 70)}
+power = length(which(keepdegs %in% quasidegs))/length(keepdegs)
+
+# 2. FDP: the proportion of all DEGs that are false positives
+FDP = 1-(length(which(quasidegs %in% keepdegs))/length(quasidegs))
+
+# 3. ROC AUC
+library("pROC")
+allgenes = row.names(results(dds.deg.quasi))
+truelabels = as.numeric(allgenes %in% keepdegs)
+quasilabels = as.numeric(allgenes %in% quasidegs)
+AUC = auc(truelabels, quasilabels)
+# Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
+normAUC = (AUC-0.5)*2
 
 ## 'Permuted' and 'semi-synthetic' datasets used by Li et al
 # Permuted: 
