@@ -153,14 +153,20 @@ process PERMUTE_PLOTS{
                                     permutes = edger.perms)
   permuteplot.input = rbind(deseq.permute.input,edger.permute.input)
 
-  gg.permute = ggplot(permuteplot.input, aes(x = method, y = permutes)) +
-      geom_point() +
-      geom_point(aes(x = method, y = nDEGs), color = "red")
+ 
+  print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
+          geom_point(size = 3, alpha = 0.7) +
+          geom_point(aes(x = method, y = nDEGs), 
+                    size =4 , color = "black", fill = "red", shape = 23) +
+          labs(x = "Method", y = "Number of DEGs") +
+          theme_bw()
+  )
+
 
   ggsave(gg.permute, 
        filename = "permute_plot.pdf",
        device = "pdf", bg = "transparent",
-       width =  20, height = 20, units = "cm")
+       width =  30, height = 20, units = "cm")
 
   """
 
