@@ -6,7 +6,6 @@ include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
-include { DESEQ_PERMUTE_COLLECT } from './modules/deseq_permute_collect.nf'
 include { DATA_QUASI } from './modules/data_quasi.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
 include { DESEQ_QUASI_COLLECT } from './modules/deseq_quasi_collect.nf'
@@ -93,39 +92,16 @@ process EDGER_PERMUTE{
   """
 }
 
-process EDGER_PERMUTE_COLLECT{
-
-  //debug true
-
-  input: 
-  val nDEGs_list
-
-  output:
-  path "edger_nDEGs_list.RData"
-
-  script:
-  """
-  #!/usr/bin/env Rscript
-  library("tidyverse")
-
-  objlist = str_remove_all("$nDEGs_list","[\\\\[\\\\] ]") %>% strsplit(split = ",") %>% unlist()
-  permdeglist = sapply(objlist, function(x) get(load(x))) %>% unname()
-
-  save(permdeglist, file="edger_nDEGs_list.RData")
-  """
-}
-
 process PERMUTE_PLOTS{
 
-  publishDir "$params.outdir"
-
   debug true
+  publishDir "$params.outdir"
 
   input:
   path deseq_table
-  path deseq_perms
+  val deseq_perms
   path edger_table
-  path edger_perms
+  val edger_perms
 
   output:
   path "permute_plot.pdf"
@@ -135,25 +111,37 @@ process PERMUTE_PLOTS{
   library("tidyverse")
   library("DESeq2")
 
-  # DESeq inputs
+  ## DESeq inputs
+  # DEGs from full model
   deseq.res = get(load("$deseq_table"))
   deseq.table = results(deseq.res)
   deseq.ndegs = nrow(subset(deseq.table, padj<0.05))
-  deseq.perms = get(load("$deseq_perms"))
+  # Permutations
+  deseq.inlist = str_remove_all("$deseq_perms","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+  deseq.perms = sapply(deseq.inlist, function(x) get(load(x))) %>% unname()
+  # Collated input
   deseq.permute.input = data.frame( method = "DESeq2", 
-                                    nDEGs = deseq.ndegs, 
-                                    permutes = deseq.perms)
+                                  nDEGs = deseq.ndegs, 
+                                  permutes = deseq.perms
+                                  )
 
-  # edgeR inputs
+  ## edgeR inputs
+  # DEGs from full model
   edger.table = read.csv("$edger_table", row.names = 1)
   edger.ndegs = nrow(subset(edger.table, padj<0.05))
-  edger.perms = get(load("$edger_perms"))
+  # Permutations
+  edger.inlist = str_remove_all("$edger_perms","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+  edger.perms = sapply(edger.inlist, function(x) get(load(x))) %>% unname()
+  # Collated input
   edger.permute.input =  data.frame(method = "edgeR", 
                                     nDEGs = edger.ndegs, 
                                     permutes = edger.perms)
+
+  # Combined inputs for plotting
   permuteplot.input = rbind(deseq.permute.input,edger.permute.input)
 
- 
   print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
           geom_point(size = 3, alpha = 0.7) +
           geom_point(aes(x = method, y = nDEGs), 
@@ -161,7 +149,6 @@ process PERMUTE_PLOTS{
           labs(x = "Method", y = "Number of DEGs") +
           theme_bw()
   )
-
 
   ggsave(gg.permute, 
        filename = "permute_plot.pdf",
@@ -182,28 +169,23 @@ workflow {
   DESEQ_BASIC(CLEANINPUTS.out)
   EDGER_BASIC(CLEANINPUTS.out)
 
-  //Permutation analysis with no true signal
+  ////Permutation analysis with no true signal
   perms = Channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
   // For DESeq
   DESEQ_PERMUTE(DATA_PERMUTE.out)
   DESEQ_PERMUTE.out.nDEGs
-  .collect() |
-  DESEQ_PERMUTE_COLLECT 
   // For edgeR
   EDGER_PERMUTE(DATA_PERMUTE.out)
   EDGER_PERMUTE.out.nDEGs
-  .collect() |
-  EDGER_PERMUTE_COLLECT 
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out,
-    DESEQ_PERMUTE_COLLECT.out,
+    DESEQ_PERMUTE.out.nDEGs.collect(),
     EDGER_BASIC.out,
-    EDGER_PERMUTE_COLLECT.out
+    EDGER_PERMUTE.out.nDEGs.collect()
   )
 
-  
   DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 
 
