@@ -13,11 +13,12 @@ process CLEANINPUTS {
     script:
     """
     #!/usr/bin/env Rscript
-    library("tidyverse")
+    library("tidyverse", quietly = TRUE)
 
     # Setup
     samplesheet = read.csv("$samplesheet")
-    countsframe = read.delim("$countsframe", row.names = 1) %>% select_if(is.numeric)
+    countsframe = read.delim("$countsframe", row.names = 1, check.names = FALSE) %>% 
+        select_if(is.numeric)
 
     # Check count and phenotype matrix conformity
     stopifnot(identical(sort(samplesheet\$sample), sort(colnames(countsframe))))

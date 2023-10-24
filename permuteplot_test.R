@@ -34,29 +34,55 @@ ggsave(gg.permute,
 # This is a histogram using the fully permuted data, which shows the proportion of datasets in which a given gene was identified as DE when permuted (x axis) vs the number of genes for which that proportion was true (y axis)
 # So to make this work, what we need is to get lists of all genes and whether they are DE or non-DE from a whole bunch of permutations. Example data:
 
-
-
-data.frame(row.names = row.names(dds.deg), padj = runif(nrow(dds.deg),0,1)<0.25)
-
-list()
+foo = c("/Users/benjamin/Repositories/Zuzu/work/53/169bb981b7e290130fd97b23ad69c6/deseq_table.csv", "/Users/benjamin/Repositories/Zuzu/work/45/7efc46d023137303ded9715c7d117b/deseq_table.csv", "/Users/benjamin/Repositories/Zuzu/work/e8/9371b6fccf3fcfafa563dfe54ff1b9/deseq_table.csv")
 
 
 thisfun = function(x){
-  res <- results(x)
+  res <- read.csv(x,row.names = 1)
   df <- data.frame(result = (res$padj<0.05), row.names = row.names(res))
   return(df)
 }
 
-thisfun(dds.deg) 
+bar = lapply(foo,thisfun)
+list_cbind(bar)
 
-runif(nrow(results(dds.deg)),0,1)
+deseq.permdegs = lapply(foo,thisfun) %>% 
+  list_cbind() %>%
+  rowSums()
+
+edger.permdegs = lapply(foo,thisfun) %>% 
+  list_cbind() %>%
+  rowSums() %>% sort()
+
+permhist.in = cbind(deseq.permdegs,edger.permdegs) %>%
+  `colnames<-`(c("DESeq2","edgeR")) %>%
+  melt()
+
+nperms = 100
+
+# Generate breaks contingent on number of reps
+cutbreaks = cut(seq(1,nperms+1),breaks = 5, right = TRUE) %>% levels() %>%
+  str_match("\\([^,]*") %>%
+  str_remove("\\(") %>%
+  as.numeric() %>%
+  round()
+#deal with an idiosyncrasy that causes cut to return 0 as the start value of the first bin instead of 1
+cutbreaks[1] = 1
+
+if(DEBUG){permhist.in$value = blorg}
+
+ggplot(permhist.in, aes(x = value)) +
+  geom_histogram(color = "black", fill = "white", bins = (nperms+1)) +
+  scale_x_continuous(limits = c(1,(nreps+1)), breaks = cutbreaks) +
+  labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
+       y = "Number of genes") +
+  theme_bw() +
+  facet_grid(~Var2)
 
 
-thisfun = function(x){
-  res <- results(x)
-  df <- data.frame(result = (runif(nrow(results(dds.deg)),0,1)<0.25), row.names = row.names(res))
-  return(df)
-}
+
+
+
 
 
 qux = data.frame(row.names = row.names(results(dds.deg)))
@@ -68,18 +94,5 @@ for(i in 1:10){
 
 nreps = 100
 
-# Generate breaks contingent on number of reps
-cutbreaks = cut(seq(1,nreps+1),breaks = 5, right = TRUE) %>% levels() %>%
-  str_match("\\([^,]*") %>%
-  str_remove("\\(") %>%
-  as.numeric() %>%
-  round()
-#deal with an idiosyncrasy that causes cut to return 0 as the start value of the first bin instead of 1
-cutbreaks[1] = 1
 
-ggplot(data.frame(blorg), aes(x = blorg)) +
-  geom_histogram(color = "black", fill = "white", bins = (nreps+1)) +
-  scale_x_continuous(limits = c(1,(nreps+1)), breaks = cutbreaks) +
-  labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
-       y = "Number of genes") +
-  theme_bw()
+ggplot(data.frame(blorg), 

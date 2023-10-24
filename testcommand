@@ -1,7 +1,7 @@
 nextflow run main.nf \
-    --samplesheet "input/test/samplesheet_phenotype.csv" \
-    --countsframe "input/test/salmon.merged.gene_counts.tsv" \
+    --samplesheet "input/test2/samplesheet_phenotype.csv" \
+    --countsframe "input/test2/salmon.merged.gene_counts.tsv" \
     --reflevel "nurse" \
     --outdir "output" \
-    --nperms 3 \
+    --nperms 5 \
     -resume

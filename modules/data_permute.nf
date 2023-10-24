@@ -15,7 +15,7 @@ process DATA_PERMUTE{
   #print(paste0("DEBUG: ", "$samplesheet", " ", "$x"))
 
   samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1)
+  countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = FALSE)
 
   # Permute colnames at random while preserving gene counts
   set.seed($x)

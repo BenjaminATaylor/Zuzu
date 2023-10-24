@@ -11,20 +11,20 @@ process QUALITYCONTROL {
   script:
   """
   #!/usr/bin/env Rscript
-  library("tidyverse")
 
   # Here we're looking to generate some nice diagnostic output plots
   # Some of this draws from this standard protocol: https://f1000research.com/articles/4-1070
 
-  library("DESeq2")
-  library("pheatmap")
-  library("RColorBrewer")
-  library("reshape2")
-  library("ggpubr")
-  library("ggplotify")
+  library("tidyverse", quiet = TRUE)
+  library("DESeq2", quiet = TRUE)
+  library("pheatmap", quiet = TRUE)
+  library("RColorBrewer", quiet = TRUE)
+  library("reshape2", quiet = TRUE)
+  library("ggpubr", quiet = TRUE)
+  library("ggplotify", quiet = TRUE)
 
   samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe",row.names = 1)
+  countsframe.clean = read.csv("$countsframe",row.names = 1, check.names = FALSE)
 
   vst.counts = countsframe.clean %>% as.matrix() %>% varianceStabilizingTransformation()
 
