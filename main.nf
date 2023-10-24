@@ -6,6 +6,7 @@ include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
+include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { DATA_QUASI } from './modules/data_quasi.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
 include { DESEQ_QUASI_COLLECT } from './modules/deseq_quasi_collect.nf'
@@ -62,7 +63,7 @@ process EDGER_PERMUTE{
   tuple path(samplesheet), path(countsframe) 
 
   output:
-  path "edger_table.csv"
+  path "edger_table.csv", emit: outfile
   path "nDEGs.RData", emit: nDEGs
 
   script:
@@ -92,72 +93,27 @@ process EDGER_PERMUTE{
   """
 }
 
-process PERMUTE_PLOTS{
+process PERMUTE_HISTS{
 
   debug true
-  publishDir "$params.outdir"
 
-  input:
-  path deseq_table
-  val deseq_perms
-  path edger_table
-  val edger_perms
+  input: 
+  val edge_infiles
+  val deseq_infiles
 
-  output:
-  path "permute_plot.pdf"
-
+  script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse")
-  library("DESeq2")
 
-  ## DESeq inputs
-  # DEGs from full model
-  deseq.res = get(load("$deseq_table"))
-  deseq.table = results(deseq.res)
-  deseq.ndegs = nrow(subset(deseq.table, padj<0.05))
-  # Permutations
-  deseq.inlist = str_remove_all("$deseq_perms","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-  deseq.perms = sapply(deseq.inlist, function(x) get(load(x))) %>% unname()
-  # Collated input
-  deseq.permute.input = data.frame( method = "DESeq2", 
-                                  nDEGs = deseq.ndegs, 
-                                  permutes = deseq.perms
-                                  )
+  print("$edge_infiles")
+  print("$deseq_infiles")
 
-  ## edgeR inputs
-  # DEGs from full model
-  edger.table = read.csv("$edger_table", row.names = 1)
-  edger.ndegs = nrow(subset(edger.table, padj<0.05))
-  # Permutations
-  edger.inlist = str_remove_all("$edger_perms","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-  edger.perms = sapply(edger.inlist, function(x) get(load(x))) %>% unname()
-  # Collated input
-  edger.permute.input =  data.frame(method = "edgeR", 
-                                    nDEGs = edger.ndegs, 
-                                    permutes = edger.perms)
-
-  # Combined inputs for plotting
-  permuteplot.input = rbind(deseq.permute.input,edger.permute.input)
-
-  print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
-          geom_point(size = 3, alpha = 0.7) +
-          geom_point(aes(x = method, y = nDEGs), 
-                    size =4 , color = "black", fill = "red", shape = 23) +
-          labs(x = "Method", y = "Number of DEGs") +
-          theme_bw()
-  )
-
-  ggsave(gg.permute, 
-       filename = "permute_plot.pdf",
-       device = "pdf", bg = "transparent",
-       width =  30, height = 20, units = "cm")
+  
 
   """
-
 }
+
 
 
 workflow {
@@ -180,13 +136,17 @@ workflow {
   EDGER_PERMUTE.out.nDEGs
   // Combine outputs and plot
   PERMUTE_PLOTS(
-    DESEQ_BASIC.out,
+    DESEQ_BASIC.out.table,
     DESEQ_PERMUTE.out.nDEGs.collect(),
     EDGER_BASIC.out,
     EDGER_PERMUTE.out.nDEGs.collect()
   )
+  PERMUTE_HISTS(
+    DESEQ_PERMUTE.out.outfile.collect(),
+    EDGER_PERMUTE.out.outfile.collect()
+  )
 
-  DATA_QUASI(DESEQ_BASIC.out, CLEANINPUTS.out, perms) |
+  DATA_QUASI(DESEQ_BASIC.out.dds, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 
 
   DESEQ_QUASI.out

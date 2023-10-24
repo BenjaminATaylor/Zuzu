@@ -4,7 +4,7 @@ process DESEQ_PERMUTE{
   tuple path(samplesheet), path(countsframe) 
 
   output:
-  path "dds_deg.RData"
+  path "deseq_table.csv", emit: outfile
   path "nDEGs.RData", emit: nDEGs
 
   script:
@@ -24,6 +24,6 @@ process DESEQ_PERMUTE{
   dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
   nDEGs = nrow(subset(results(dds.deg),padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  save(dds.deg, file = "dds_deg.RData")
+  write.csv(data.frame(results(dds.deg)),row.names=TRUE, file = "deseq_table.csv")
   """
 }

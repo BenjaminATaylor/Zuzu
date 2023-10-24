@@ -9,9 +9,9 @@ process DESEQ_QUASI {
   script:
   """
   #!/usr/bin/env Rscript
-  library("tidyverse")
-  library("DESeq2")
-  library("pROC")
+  library("tidyverse", quietly = TRUE)
+  library("DESeq2", quietly = TRUE)
+  library("pROC", quietly = TRUE)
 
   DEBUG=TRUE
 

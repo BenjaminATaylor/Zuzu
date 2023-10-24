@@ -11,8 +11,8 @@ process DATA_QUASI{
   script:
   """
   #!/usr/bin/env Rscript
-  library("tidyverse")
-  library("DESeq2")
+  library("tidyverse", quietly = TRUE)
+  library("DESeq2", quietly = TRUE)
 
   samplesheet = read.csv("$samplesheet")
   countsframe.clean = read.csv("$countsframe", row.names = 1)

@@ -18,8 +18,68 @@ permuteplot.input = data.frame(method = c(rep("DESeq",10),rep("edgeR",10)),
 print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
         geom_point(size = 3, alpha = 0.7) +
         geom_point(aes(x = method, y = nDEGs), 
-                   size =3, color = "red") +
+                   size =4 , color = "black", fill = "red", shape = 23) +
         labs(x = "Method", y = "Number of DEGs") +
         theme_bw()
 )
 
+ggsave(gg.permute, 
+       filename = "permute_plot.pdf",
+       device = "pdf", bg = "transparent",
+       width =  30, height = 20, units = "cm")
+
+
+
+### Another plot we'd like to recreate is Fig 1B from Li et al. 
+# This is a histogram using the fully permuted data, which shows the proportion of datasets in which a given gene was identified as DE when permuted (x axis) vs the number of genes for which that proportion was true (y axis)
+# So to make this work, what we need is to get lists of all genes and whether they are DE or non-DE from a whole bunch of permutations. Example data:
+
+
+
+data.frame(row.names = row.names(dds.deg), padj = runif(nrow(dds.deg),0,1)<0.25)
+
+list()
+
+
+thisfun = function(x){
+  res <- results(x)
+  df <- data.frame(result = (res$padj<0.05), row.names = row.names(res))
+  return(df)
+}
+
+thisfun(dds.deg) 
+
+runif(nrow(results(dds.deg)),0,1)
+
+
+thisfun = function(x){
+  res <- results(x)
+  df <- data.frame(result = (runif(nrow(results(dds.deg)),0,1)<0.25), row.names = row.names(res))
+  return(df)
+}
+
+
+qux = data.frame(row.names = row.names(results(dds.deg)))
+for(i in 1:10){
+  
+  qux = cbind(qux, data.frame(row.names = row.names(dds.deg), padj = runif(nrow(dds.deg),0,1)<0.25))  
+  
+}
+
+nreps = 100
+
+# Generate breaks contingent on number of reps
+cutbreaks = cut(seq(1,nreps+1),breaks = 5, right = TRUE) %>% levels() %>%
+  str_match("\\([^,]*") %>%
+  str_remove("\\(") %>%
+  as.numeric() %>%
+  round()
+#deal with an idiosyncrasy that causes cut to return 0 as the start value of the first bin instead of 1
+cutbreaks[1] = 1
+
+ggplot(data.frame(blorg), aes(x = blorg)) +
+  geom_histogram(color = "black", fill = "white", bins = (nreps+1)) +
+  scale_x_continuous(limits = c(1,(nreps+1)), breaks = cutbreaks) +
+  labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
+       y = "Number of genes") +
+  theme_bw()
