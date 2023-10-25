@@ -13,7 +13,7 @@ process DESEQ_QUASI {
   library("DESeq2", quietly = TRUE)
   library("pROC", quietly = TRUE)
 
-  DEBUG=TRUE
+  DEBUG=FALSE
 
   samplesheet = read.csv("$samplesheet")
   quasi.frame = read.csv("$quasiframe", row.names = 1)

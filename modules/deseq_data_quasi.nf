@@ -1,4 +1,4 @@
-process DATA_QUASI{
+process DESEQ_DATA_QUASI{
 
   input:
   path dds
@@ -20,12 +20,12 @@ process DATA_QUASI{
   set.seed($x)
 
   # Identify 'true' degs with very strict FDR
-  truedegs = row.names(subset(results(dds.deg,alpha = 0.000001),padj<0.05))
+  truedegs = row.names(subset(results(dds.deg,alpha = 0.000001),padj<0.000001))
   # Select half of true degs
   keepnum = round(length(truedegs)/2)
 
   # Temporary lines for testing 
-  DEBUG=TRUE
+  DEBUG=FALSE
   if(DEBUG){keepnum = 100 ; truedegs = sample(row.names(results(dds.deg)),200) } 
 
   #Select a subset of the 'true' degs to keep constant

@@ -8,9 +8,11 @@ include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
 include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
-include { DATA_QUASI } from './modules/data_quasi.nf'
+include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
 include { DESEQ_QUASI_COLLECT } from './modules/deseq_quasi_collect.nf'
+include { EDGER_QUASI } from './modules/edger_quasi.nf'
+include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 
 //exit 1, 'DEBUG'
 
@@ -128,13 +130,16 @@ workflow {
     EDGER_PERMUTE.out.outfile.collect()
   )
 
-  DATA_QUASI(DESEQ_BASIC.out.dds, CLEANINPUTS.out, perms) |
+  DESEQ_DATA_QUASI(DESEQ_BASIC.out.dds, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 
 
   DESEQ_QUASI.out
   .collect() |
   DESEQ_QUASI_COLLECT
 
-  //DESEQ_QUASI_COLLECT.out.view()
+
+  EDGER_DATA_QUASI(EDGER_BASIC.out, CLEANINPUTS.out, perms) |
+  EDGER_QUASI 
+  EDGER_QUASI.out.view()
 
 }
