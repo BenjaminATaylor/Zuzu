@@ -41,4 +41,8 @@ ggplot(gg.quasi.input, aes(x = method, y = value)) +
   geom_point(size = 3, alpha = 0.7) +
   scale_y_continuous(limits = c(0,1)) +
   labs(x = "Method",y = "Value") +
-  facet_grid(~variable)
+  facet_grid(~variable) +
+  theme_bw() +
+  theme(strip.background = element_blank())
+
+  

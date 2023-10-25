@@ -139,8 +139,12 @@ process QUASI_PLOTS {
   gg.quasi.input = rbind(deseq.quasi.input, edger.quasi.input)
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
-    geom_point() +
-    facet_grid(~variable)
+    geom_point(size = 3, alpha = 0.7) +
+    scale_y_continuous(limits = c(0,1)) +
+    labs(x = "Method",y = "Value") +
+    facet_grid(~variable) +
+    theme_bw() +
+    theme(strip.background = element_blank())
 
   ggsave(gg.quasi, 
      filename = "quasi_plot.pdf",
