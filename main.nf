@@ -96,7 +96,58 @@ process EDGER_PERMUTE{
   """
 }
 
+process QUASI_PLOTS {
 
+  publishDir "$params.outdir"
+
+  input:
+  val deseq_quasis
+  val edger_quasis
+
+  output:
+  path "quasi_plot.pdf"
+
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse", quietly = TRUE)
+  library("reshape2", quietly = TRUE)
+
+  deseq.inlist = str_remove_all("$deseq_quasis","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+
+  deseq.quasi.input = 
+    sapply(deseq.inlist, read.csv) %>% 
+    t() %>% 
+    `row.names<-`(NULL) %>% 
+    data.frame() %>%
+    mutate_all(as.numeric) %>%
+    mutate(method = "DESeq2") %>% 
+    melt(id.vars = "method")
+
+  edger.inlist = str_remove_all("$edger_quasis","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+
+  edger.quasi.input = 
+    sapply(edger.inlist, read.csv) %>% 
+    t() %>% 
+    `row.names<-`(NULL) %>% 
+    data.frame() %>%
+    mutate_all(as.numeric) %>%
+    mutate(method = "edgeR") %>% 
+    melt(id.vars = "method")
+
+  gg.quasi.input = rbind(deseq.quasi.input, edger.quasi.input)
+
+  gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
+    geom_point() +
+    facet_grid(~variable)
+
+  ggsave(gg.quasi, 
+     filename = "quasi_plot.pdf",
+     device = "pdf", bg = "transparent",
+     width =  30, height = 20, units = "cm")
+  """
+}
 
 
 
@@ -130,16 +181,15 @@ workflow {
     EDGER_PERMUTE.out.outfile.collect()
   )
 
+  //Quasi-permutation analysis with partial true signal retained
   DESEQ_DATA_QUASI(DESEQ_BASIC.out.dds, CLEANINPUTS.out, perms) |
   DESEQ_QUASI 
-
-  DESEQ_QUASI.out
-  .collect() |
-  DESEQ_QUASI_COLLECT
-
-
   EDGER_DATA_QUASI(EDGER_BASIC.out, CLEANINPUTS.out, perms) |
   EDGER_QUASI 
-  EDGER_QUASI.out.view()
+  // Combine outputs and plot
+  QUASI_PLOTS(
+    DESEQ_QUASI.out.collect(),
+    EDGER_QUASI.out.collect()
+  )
 
 }
