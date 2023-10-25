@@ -72,12 +72,14 @@ cutbreaks[1] = 1
 if(DEBUG){permhist.in$value = blorg}
 
 ggplot(permhist.in, aes(x = value)) +
-  geom_histogram(color = "black", fill = "white", bins = (nperms+1)) +
+  geom_histogram(color = "black", fill = "white", bins = 100) +
   scale_x_continuous(limits = c(1,(nreps+1)), breaks = cutbreaks) +
   labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
        y = "Number of genes") +
   theme_bw() +
-  facet_grid(~Var2)
+  facet_grid(~Var2) +
+  theme(strip.background = element_blank())
+
 
 
 
