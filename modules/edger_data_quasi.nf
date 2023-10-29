@@ -36,7 +36,7 @@ process EDGER_DATA_QUASI{
   edger.res = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
 
   # Identify 'true' degs with very strict FDR
-  truedegs = row.names(subset(edger.res,padj<0.000001))
+  truedegs = row.names(subset(edger.res,padj<$params.truecutoff))
   # Select half of true degs
   keepnum = round(length(truedegs)/2)
 

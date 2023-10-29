@@ -196,6 +196,7 @@ workflow {
   DESEQ_QUASI(DESEQ_DATA_QUASI.out)
   EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(samplenums))
   EDGER_QUASI(EDGER_DATA_QUASI.out)
+
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),

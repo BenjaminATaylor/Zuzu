@@ -34,7 +34,7 @@ process DESEQ_DATA_QUASI{
   dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
 
   # Identify 'true' degs with very strict FDR
-  truedegs = row.names(subset(results(dds.deg,alpha = 0.000001),padj<0.000001))
+  truedegs = row.names(subset(results(dds.deg,alpha = $params.truecutoff),padj<$params.truecutoff))
   # Select half of true degs
   keepnum = round(length(truedegs)/2)
 

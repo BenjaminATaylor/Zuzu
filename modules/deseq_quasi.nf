@@ -49,7 +49,7 @@ process DESEQ_QUASI {
     normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
 
     # Save outputs
-    outframe = data.frame(power = power, FDP = FDP, normAUC = normAUC, sampenum = samplenum)
+    outframe = data.frame(power = power, FDP = FDP, normAUC = normAUC, samplenum = samplenum)
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
   } else {
     outframe = data.frame(power = NA, FDP = NA, normAUC = NA, samplenum = samplenum)
