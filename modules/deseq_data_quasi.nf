@@ -1,12 +1,11 @@
 process DESEQ_DATA_QUASI{
 
   input:
-  path dds
   tuple path(samplesheet), path(countsframe)
-  val x
+  tuple val(x), val(samplenum)
 
   output:
-  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData"), path(samplesheet)
+  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData"), path(samplesheet), val(samplenum)
 
   script:
   """
@@ -15,9 +14,24 @@ process DESEQ_DATA_QUASI{
   library("DESeq2", quietly = TRUE)
 
   samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1)
-  dds.deg = get(load("$dds"))
+  countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = F)
   set.seed($x)
+  n.samples = $samplenum
+
+  # Take a random subset of the samples based on our chosen subsample size
+  phenos = unique(samplesheet\$phenotype)
+  chosen.samples = c(sample(subset(samplesheet, phenotype == phenos[1])\$sample,n.samples),
+                     sample(subset(samplesheet, phenotype == phenos[2])\$sample,n.samples))
+  samplesheet.sub = subset(samplesheet, sample %in% chosen.samples)
+  countsframe.sub = countsframe.clean[,samplesheet.sub\$sample]
+  stopifnot(colnames(countsframe.sub) == samplesheet.sub\$sample)
+
+  # Re-run deseq for our new dataset
+  dds = DESeqDataSetFromMatrix(countData = countsframe.sub,
+                               colData = samplesheet.sub,
+                               design = as.formula(~phenotype))
+  # Run the default analysis for DESeq2
+  dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
 
   # Identify 'true' degs with very strict FDR
   truedegs = row.names(subset(results(dds.deg,alpha = 0.000001),padj<0.000001))

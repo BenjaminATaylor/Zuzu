@@ -4,4 +4,5 @@ nextflow run main.nf \
     --reflevel "nurse" \
     --outdir "output" \
     --nperms 10 \
+    --samplenum 9 \
     -resume

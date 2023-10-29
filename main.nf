@@ -10,7 +10,6 @@ include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
 include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
-include { DESEQ_QUASI_COLLECT } from './modules/deseq_quasi_collect.nf'
 include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 
@@ -27,6 +26,10 @@ params.nperms = 7
 println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
+
+def cutline = params.samplenum.intdiv(3)
+def breaks = [cutline,cutline*2,params.samplenum]
+
 
 process EDGER_BASIC{
 
@@ -122,7 +125,7 @@ process QUASI_PLOTS {
     data.frame() %>%
     mutate_all(as.numeric) %>%
     mutate(method = "DESeq2") %>% 
-    melt(id.vars = "method")
+    melt(id.vars = c("method","samplenum"))
 
   edger.inlist = str_remove_all("$edger_quasis","[\\\\[\\\\] ]") %>% 
     strsplit(split = ",") %>% unlist()
@@ -134,15 +137,15 @@ process QUASI_PLOTS {
     data.frame() %>%
     mutate_all(as.numeric) %>%
     mutate(method = "edgeR") %>% 
-    melt(id.vars = "method")
+    melt(id.vars = c("method","samplenum"))
 
   gg.quasi.input = rbind(deseq.quasi.input, edger.quasi.input)
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
     scale_y_continuous(limits = c(0,1)) +
-    labs(x = "Method",y = "Value") +
-    facet_grid(~variable) +
+    labs(x = "Method",y = "Replicates per group") +
+    facet_grid(samplenum~variable) +
     theme_bw() +
     theme(strip.background = element_blank())
 
@@ -186,10 +189,13 @@ workflow {
   )
 
   //Quasi-permutation analysis with partial true signal retained
-  DESEQ_DATA_QUASI(DESEQ_BASIC.out.dds, CLEANINPUTS.out, perms) |
-  DESEQ_QUASI 
-  EDGER_DATA_QUASI(EDGER_BASIC.out, CLEANINPUTS.out, perms) |
-  EDGER_QUASI 
+  samplenums = Channel.from(breaks)
+  //samplenums.subscribe { println "DEBUG: $it" }
+
+  DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(samplenums))
+  DESEQ_QUASI(DESEQ_DATA_QUASI.out)
+  EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(samplenums))
+  EDGER_QUASI(EDGER_DATA_QUASI.out)
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),
