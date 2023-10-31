@@ -22,8 +22,8 @@ process DESEQ_QUASI {
   quasi.frame = read.csv("$quasiframe", row.names = 1)
   truedegs = get(load("$truedegs"))
 
-  # Generate output metrics only if there are at least 50 'true' DEGs, otherwise outputs NAs
-  if(length(truedegs)>50){
+  # Generate output metrics only if there are at least 10 'true' DEGs, otherwise outputs NAs
+  if(length(truedegs)>10){
     #generate model
     dds = DESeqDataSetFromMatrix(countData = quasi.frame,
                                 colData = samplesheet,

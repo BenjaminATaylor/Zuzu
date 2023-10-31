@@ -20,8 +20,8 @@ process EDGER_QUASI {
     truedegs = get(load("$truedegs"))
     samplenum = $samplenum
 
-    # Generate output metrics only if there are at least 50 'true' DEGs, otherwise outputs NAs
-    if(length(truedegs)>50){
+    # Generate output metrics only if there are at least 10 'true' DEGs, otherwise outputs NAs
+    if(length(truedegs)>10){
 
         #edgeR analysis using quasi-permuted data
         dds.edge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)

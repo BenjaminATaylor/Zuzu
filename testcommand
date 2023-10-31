@@ -4,18 +4,6 @@ nextflow run main.nf \
     --reflevel "Pre-treatment" \
     --outdir "output" \
     --nperms 3 \
-    --truecutoff 0.000001 \
+    --truecutoff 0.00001 \
     -resume
 
-
-
-reflevel="On-treatment"
-
-awk -v reflevel=$reflevel -F ',' '$2 ~ reflevel && $2 !~ "phenotype" {print}' input/test3/samplesheet_phenotype.csv 
-
-
-
-
-cat input/test3/samplesheet_phenotype.csv | awk -F ',' '$2 == "Pretreatment" {print}' 
-
-awk '/pattern1/ || /pattern2/{print}'
