@@ -27,9 +27,8 @@ println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
 
-def cutline = params.samplenum.intdiv(3)
-def breaks = [cutline,cutline*2,params.samplenum]
-
+//def cutline = params.samplenum.intdiv(3)
+//def breaks = [cutline,cutline*2,params.samplenum]
 
 process EDGER_BASIC{
 
@@ -156,12 +155,53 @@ process QUASI_PLOTS {
   """
 }
 
+process CREATE_BREAKS {
+
+  debug true
+
+  input:
+  path samplesheet
+
+  output:
+  file 'breaks.csv'
+  //env refouts, emit: refouts
+  //env altouts, emit: altouts
+
+  """
+  #!/usr/bin/env Rscript
+  library("tidyverse", quietly = TRUE)
+  samplesheet = read.csv("$samplesheet")
+  reflevel = "$params.reflevel"
+
+  reftot = nrow(subset(samplesheet, phenotype == reflevel))
+  alttot = nrow(subset(samplesheet, phenotype != reflevel))
+
+  refbreaks = cut(seq(1,reftot),breaks = 3, right = TRUE) %>% levels() %>%
+    str_match("\\\\,[^]]*") %>%
+    str_remove(",") %>%
+    as.numeric() %>%
+    round()
+
+  altbreaks = cut(seq(1,alttot),breaks = 3, right = TRUE) %>% levels() %>%
+    str_match("\\\\,[^]]*") %>%
+    str_remove(",") %>%
+    as.numeric() %>%
+    round()
+
+  outbreaks = data.frame(refbreaks, altbreaks)
+  write.table(outbreaks, "breaks.csv", sep = ",", row.names = F, col.names = F)
+  """
+}
+
 
 
 workflow {
   //Initial data QC and cleanup
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
   QUALITYCONTROL(CLEANINPUTS.out)
+  CREATE_BREAKS(ch_samplesheet)
+  breaks = CREATE_BREAKS.out.splitCsv(header: false)
+
 
   //Basic analysis for each method
   DESEQ_BASIC(CLEANINPUTS.out)
@@ -189,12 +229,14 @@ workflow {
   )
 
   //Quasi-permutation analysis with partial true signal retained
-  samplenums = Channel.from(breaks)
-  //samplenums.subscribe { println "DEBUG: $it" }
+  //samplenums = Channel.from(breaks)
+  //amplenums.subscribe { println "DEBUG: $it" }
 
-  DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(samplenums))
+  perms.combine(breaks).view()
+
+  DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   DESEQ_QUASI(DESEQ_DATA_QUASI.out)
-  EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(samplenums))
+  EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   EDGER_QUASI(EDGER_DATA_QUASI.out)
 
   // Combine outputs and plot

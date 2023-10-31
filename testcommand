@@ -1,9 +1,21 @@
 nextflow run main.nf \
-    --samplesheet "input/test2/samplesheet_phenotype.csv" \
-    --countsframe "input/test2/salmon.merged.gene_counts.tsv" \
-    --reflevel "nurse" \
+    --samplesheet "input/test3/samplesheet_phenotype.csv" \
+    --countsframe "input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv" \
+    --reflevel "Pre-treatment" \
     --outdir "output" \
     --nperms 3 \
-    --samplenum 9 \
-    --truecutoff 0.00001 \
+    --truecutoff 0.000001 \
     -resume
+
+
+
+reflevel="On-treatment"
+
+awk -v reflevel=$reflevel -F ',' '$2 ~ reflevel && $2 !~ "phenotype" {print}' input/test3/samplesheet_phenotype.csv 
+
+
+
+
+cat input/test3/samplesheet_phenotype.csv | awk -F ',' '$2 == "Pretreatment" {print}' 
+
+awk '/pattern1/ || /pattern2/{print}'

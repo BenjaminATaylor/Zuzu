@@ -2,10 +2,10 @@ process EDGER_DATA_QUASI{
 
   input:
   tuple path(samplesheet), path(countsframe)
-  tuple val(x), val(samplenum)
+  tuple val(x), val(refnum), val(altnum)
 
   output:
-  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData"), path(samplesheet), val(samplenum)
+  tuple path("countsframe_quasi.csv"), path("trueDEGs.RData"), path(samplesheet), val(refnum)
 
   script:
   """
@@ -16,12 +16,13 @@ process EDGER_DATA_QUASI{
   samplesheet = read.csv("$samplesheet")
   countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = F)
   set.seed($x)
-  n.samples = $samplenum
+  ref.num = $refnum
+  alt.num = $altnum
 
   # Take a random subset of the samples based on our chosen subsample size
-  phenos = unique(samplesheet\$phenotype)
-  chosen.samples = c(sample(subset(samplesheet, phenotype == phenos[1])\$sample,n.samples),
-                     sample(subset(samplesheet, phenotype == phenos[2])\$sample,n.samples))
+  phenos = relevel(factor(unique(samplesheet\$phenotype)), ref = "$params.reflevel")
+  chosen.samples = c(sample(subset(samplesheet, phenotype == levels(phenos)[1])\$sample,ref.num),
+                    sample(subset(samplesheet, phenotype == levels(phenos)[2])\$sample,alt.num))
   samplesheet.sub = subset(samplesheet, sample %in% chosen.samples)
   countsframe.sub = countsframe.clean[,samplesheet.sub\$sample]
   stopifnot(colnames(countsframe.sub) == samplesheet.sub\$sample)

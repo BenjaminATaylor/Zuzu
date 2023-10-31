@@ -26,25 +26,6 @@ pheatmap of sample distances
 
 4. DESeq2 initial analysis... etc
 
+Next step: Wilcox method for all existing approaches (permuted, quasipermuted, full sim)
 
-
-What's the plan with the quasi data?
-
-These data let us generate power, FDR and ROC AUC for a given method... 
-...but we don't want this to be static. We want to measure it across a range of:
-    1. Sample sizes (but down to what value? Lowest sample sizes not appropriate for e.g. ML)
-    2. Sequencing depths?
-
-So at a first pass, we want to run X times each for X sample sizes (start small for testing purposes)
-So at each round, we do this:
-
-1. Set seed and create a quasi-permuted dataset
-2. For that dataset, repeat for each method:
-3. Calculate degs with that method with that dataset with full sample size
-4. Repeat for other sample sizes
-
-So:
-For dataset X
-And method Y
-And sample size Z
-We have N datasets
+Next step: Truly simulated data. Make this work for edgeR and DESeq2
