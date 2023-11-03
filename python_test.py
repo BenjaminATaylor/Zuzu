@@ -32,12 +32,22 @@ samplesheet.isnull().values.any()
 
 # Grab a small subset of the data for testing purposes
 # Generate a small training set
-count_data=count_data.head(n=100)
+count_data=count_data.head(n=1000)
+# In real life we'll be using filtered data
+# For testing purposes apply a meager filter
+count_data = count_data.loc[count_data.mean(axis=1)>5,:]
+
 samplesheet_train = pd.concat([
-    samplesheet.query('phenotype == "Pre-treatment"').head(n=10),
-    samplesheet.query('phenotype == "On-treatment"').head(n=10)
+    samplesheet.query('phenotype == "Pre-treatment"').head(n=30),
+    samplesheet.query('phenotype == "On-treatment"').head(n=30)
 ])
 count_data_train = count_data.loc[:,samplesheet_train.loc[:,"sample"]].transpose()
+# Make sure there are no 0-variance genes in training set
+count_data_train = count_data_train.loc[:,count_data_train.std(axis=0) != 0]
+
+
+
+
 # Generate a small testing set
 samplesheet_test = pd.concat([
     samplesheet.query('phenotype == "On-treatment"').tail(n=10),
@@ -50,14 +60,22 @@ count_data_test = count_data.loc[:,samplesheet_test.loc[:,"sample"]].transpose()
 for x in [samplesheet_train,samplesheet_test]:
     x['phenotype'] = preprocessing.LabelEncoder().fit_transform(x.phenotype)
 
-# Scale data before SVM
-count_data_test_scaled = preprocessing.StandardScaler().fit_transform(count_data_test)
-count_data_train_scaled = preprocessing.StandardScaler().fit_transform(count_data_train)
 
-# Check that scaling has worked (data should have 0 mean and unit variance)
-count_data_test_scaled.mean(axis=0) ; count_data_test_scaled.std(axis=0)
-count_data_train_scaled.mean(axis=0) ; count_data_train_scaled.std(axis=0)
-# Means are very close to 0, and STDs are either 0 or 1 (0 when there was no variance anyway)
+# Get CV error for the training
+# Note that by putting both the scaling and SVM into a pipeline here, 
+# we perform CV on the whole pipeline instead of just the SVM 
+clf = make_pipeline(preprocessing.StandardScaler(), SVC(kernel='rbf'))
+scores = cross_val_score(clf, count_data_train, samplesheet_train.phenotype, cv=5)
+print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+clf.fit(count_data_train, samplesheet_train.phenotype)
+
+
+
+
+
+
+
+
 
 # SVC
 clf = make_pipeline(StandardScaler(), SVC(kernel="rbf"))
