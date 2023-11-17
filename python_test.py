@@ -22,8 +22,13 @@ os.chdir("/Users/benjamin/Repositories/Zuzu")
 print("Hello world")
 
 # Reading the Dataset
-count_data=pd.read_table('./input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv',sep='\t',index_col=0)
-samplesheet=pd.read_csv('./input/test3/samplesheet_phenotype.csv')
+# A real test dataset
+#count_data=pd.read_table('./input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv',sep='\t',index_col=0) 
+#samplesheet=pd.read_csv('./input/test3/samplesheet_phenotype.csv')
+# A synthetic test dataset
+#count_data=pd.read_table('./input/synthtest/synth_counts.csv',sep=',',index_col=0)
+count_data=pd.read_table('./input/synthtest/synth_counts_semiperm.csv',sep=',',index_col=0)
+samplesheet=pd.read_csv('./input/synthtest/synth_metadata.csv', index_col=0)
 
 # Check null values
 count_data.isnull().values.any()
@@ -32,18 +37,47 @@ samplesheet.isnull().values.any()
 
 # Grab a small subset of the data for testing purposes
 # Generate a small training set
-count_data=count_data.head(n=1000)
+#count_data=count_data.head(n=10000)
 # In real life we'll be using filtered data
 # For testing purposes apply a meager filter
-count_data = count_data.loc[count_data.mean(axis=1)>5,:]
+#count_data = count_data.loc[count_data.mean(axis=1)>5,:]
 
-samplesheet_train = pd.concat([
-    samplesheet.query('phenotype == "Pre-treatment"').head(n=30),
-    samplesheet.query('phenotype == "On-treatment"').head(n=30)
-])
+#samplesheet_train = pd.concat([
+#    samplesheet.query('phenotype == "Pre-treatment"').head(n=20),
+#    samplesheet.query('phenotype == "On-treatment"').head(n=20)
+#])
+
+samplesheet_train = samplesheet
+
 count_data_train = count_data.loc[:,samplesheet_train.loc[:,"sample"]].transpose()
 # Make sure there are no 0-variance genes in training set
 count_data_train = count_data_train.loc[:,count_data_train.std(axis=0) != 0]
+
+# Apply a scaler 
+scaler = preprocessing.StandardScaler().fit(count_data_train)
+count_data_train_scaled = scaler.transform(count_data_train)
+
+# Switch to numeric encodings
+# (TODO: It would be nice if these were ordered with reference level = 0)
+for x in [samplesheet_train]:
+    x['phenotype'] = preprocessing.LabelEncoder().fit_transform(x.phenotype)
+    # This doesn't need to be loop, but leave like thsi in case we decide to split into train/test
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -54,11 +88,6 @@ samplesheet_test = pd.concat([
     samplesheet.query('phenotype == "Pre-treatment"').tail(n=10)
 ])
 count_data_test = count_data.loc[:,samplesheet_test.loc[:,"sample"]].transpose()
-
-# Switch to numeric encodings
-# (TODO: It would be nice if these were ordered with reference level = 0)
-for x in [samplesheet_train,samplesheet_test]:
-    x['phenotype'] = preprocessing.LabelEncoder().fit_transform(x.phenotype)
 
 
 # Get CV error for the training
