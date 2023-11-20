@@ -112,4 +112,56 @@ ggplot(testcoef, aes(x = num, y = coef)) +
 
 # Okay, so we do see that there are much stronger (more negative) coefs for the tail end of genes, which are the ones we left DE. But why are they all negative? That's weird, right? 
 # Half the DE genes should be DE in each direction.... check that this is actually the case
+synthtest.counts.DE = synthtest.counts[4901:5000,]
+table(rowMeans(synthtest.counts.DE[1:50,]) > rowMeans(synthtest.counts.DE[51:100,]))
+# Yep!
+
+
+
+# Try again for synth data: do values and weightings match to what we expect?
+somecoefs = names(read.csv("testcoefs_new.csv", check.names = F))
+somemetadata = read.csv("testmetdata_new.csv", check.names = F, header = F)
+somevalues = read.csv("testdata_new.csv", check.names = F, header = F) %>%
+  t() %>% `colnames<-`(somemetadata$V1) %>% data.frame() %>% rownames_to_column(var = "gene")
+
+plotframe = reshape2::melt(somevalues) %>% mutate(variable = substr(variable,2,2))
+
+# scatter plot is not very informative
+ggplot(plotframe, aes(x = variable, y = value)) +
+  geom_point() +
+  facet_grid(~gene)
+# make_classification begins by putting all informative feature sin the first set of variables, so we should have the first 10 here informative and the remaining random
+ggplot(plotframe, aes(x = variable, y = value)) +
+  geom_boxplot() +
+  facet_grid(~gene, scales = "free")
+
+# Hmm, with that amount of noise it's not surprising we didn't find much.
+
+# Let's try again with a larger class separation
+# Try again for synth data: do values and weightings match to what we expect?
+somecoefs = names(read.csv("testcoefs_new_double.csv", check.names = F))
+somemetadata = read.csv("testmetdata_new_double.csv", check.names = F, header = F)
+somevalues = read.csv("testdata_new_double.csv", check.names = F, header = F) %>%
+  t() %>% `colnames<-`(somemetadata$V1) %>% data.frame() %>% rownames_to_column(var = "gene")
+
+plotframe = reshape2::melt(somevalues) %>% mutate(variable = substr(variable,2,2))
+
+ggplot(plotframe, aes(x = variable, y = value)) +
+  geom_boxplot() +
+  facet_grid(~gene, scales = "free")
+
+# Ooooookay so comparing this to the previous plots, we can immediately see at least two issues:
+# 1. There are only 3 informative features, not the expected 10
+# 2. Those three features are not the first three, but rather seem to be 4, 12 and 22, scattered among the others (this latter part shouldn't have affected classification, but is further indication that make_classification is working in an unexpected manner.)
+
+
+# index0 = which(substr(colnames(somevalues),2,2)=="0")                      
+# index1 = which(substr(colnames(somevalues),2,2)=="1")     
+# 
+# somevals0 = somevalues[,index0]
+# somevals1 = somevalues[,index1]
+
+
+
+
 
