@@ -1,5 +1,7 @@
 process PERMUTE_PLOTS{
 
+  debug true
+
   publishDir "$params.outdir"
 
   input:
@@ -7,6 +9,8 @@ process PERMUTE_PLOTS{
   val deseq_perms
   path edger_table
   val edger_perms
+  path wilcox_table
+  val wilcox_perms
 
   output:
   path "permute_plot.pdf"
@@ -43,8 +47,25 @@ process PERMUTE_PLOTS{
                                     nDEGs = edger.ndegs, 
                                     permutes = edger.perms)
 
+  ## wilcoxon inputs
+  # DEGs from full model
+  wilcox.table = read.csv("$wilcox_table", row.names = 1)
+  wilcox.ndegs = nrow(subset(wilcox.table, padj<0.05))
+  # Permutations
+  wilcox.inlist = str_remove_all("$wilcox_perms","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+  wilcox.perms = sapply(wilcox.inlist, function(x) get(load(x))) %>% unname()
+  # Collated input
+  wilcox.permute.input =  data.frame(method = "wilcox", 
+                                    nDEGs = wilcox.ndegs, 
+                                    permutes = wilcox.perms)
+  print(wilcox.permute.input)
+  
+
   # Combined inputs for plotting
-  permuteplot.input = rbind(deseq.permute.input,edger.permute.input)
+  permuteplot.input = rbind(deseq.permute.input,
+                            edger.permute.input,
+                            wilcox.permute.input)
 
   print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
           geom_point(size = 3, alpha = 0.7) +

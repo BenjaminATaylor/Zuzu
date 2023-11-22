@@ -14,7 +14,7 @@ process DESEQ_PERMUTE{
   library("DESeq2")
 
   samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1)
+  countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = FALSE)
 
   #generate model
   dds = DESeqDataSetFromMatrix(countData = countsframe.clean,

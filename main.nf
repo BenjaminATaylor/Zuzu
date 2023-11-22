@@ -4,12 +4,15 @@
 include { CLEANINPUTS } from './modules/cleaninputs.nf'
 include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
+include { EDGER_BASIC } from './modules/edger_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
+include { EDGER_PERMUTE } from './modules/edger_permute.nf'
+include { WILCOXON_PERMUTE } from './modules/wilcoxon_permute.nf'
 include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
-include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
+include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 
@@ -30,39 +33,7 @@ println("Reference level: " + ch_reflevel)
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
 
-process EDGER_BASIC{
-
-  input: 
-  tuple path(samplesheet), path(countsframe) 
-
-  output:
-  path "edger_table.csv"
-
-  script:
-  """
-  #!/usr/bin/env Rscript
-  library("edgeR") 
-  library("tidyverse")
-
-  # Input data
-  samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1)
-
-  # Basic edgeR workflow, taken from the documentation
-  dds.edge = DGEList(counts=countsframe.clean,group=samplesheet\$phenotype)
-  dds.edge = normLibSizes(dds.edge)
-  design.edge = model.matrix(~samplesheet\$phenotype)
-  dds.edge.est = estimateDisp(dds.edge,design.edge)
-  edge.fit = glmQLFit(dds.edge.est,design.edge)
-  edge.qlf = glmQLFTest(edge.fit,coef=2)
-
-  # Tabular output (perform FDR correction directly rather than relying on topTags to do it for us)
-  edge.out = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
-  write.csv(edge.out, row.names = T, file="edger_table.csv")
-  """
-}
-
-process WILCOX_BASIC{
+process WILCOXON_BASIC{
 
   input: 
   tuple path(samplesheet), path(countsframe) 
@@ -100,48 +71,94 @@ process WILCOX_BASIC{
   wilcox.padj = p.adjust(wilcox.p,method = "BH") %>% 
     `names<-`(allgenes) %>% 
     data.frame() %>%
-    `colnames<-`("FDR")
+    `colnames<-`("padj")
 
   write.csv(wilcox.padj, file = "wilcox_table.csv")
   """
 }
 
 
-process EDGER_PERMUTE{
+process SVC_BASIC{
 
+  //debug true
+  
   input: 
   tuple path(samplesheet), path(countsframe) 
 
   output:
-  path "edger_table.csv", emit: outfile
-  path "nDEGs.RData", emit: nDEGs
+  path "svc_table.csv"
 
   script:
   """
-  #!/usr/bin/env Rscript
-  library("edgeR") 
-  library("tidyverse")
+  #!/usr/bin/env python3
+  import pandas as pd
+  import numpy as np
+  import os
+  import csv
+
+  from sklearn import preprocessing
+  from sklearn.feature_selection import RFECV
+  from sklearn.svm import SVC
+  from sklearn.model_selection import StratifiedKFold
 
   # Input data
-  samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1)
+  # Reading the Dataset
+  count_data=pd.read_table('$countsframe',sep=',',index_col=0) 
+  samplesheet=pd.read_csv('$samplesheet')
 
-  # Basic edgeR workflow, taken from the documentation
-  dds.edge = DGEList(counts=countsframe.clean,group=samplesheet\$phenotype)
-  dds.edge = normLibSizes(dds.edge)
-  design.edge = model.matrix(~samplesheet\$phenotype)
-  dds.edge.est = estimateDisp(dds.edge,design.edge)
-  edge.fit = glmQLFit(dds.edge.est,design.edge)
-  edge.qlf = glmQLFTest(edge.fit,coef=2)
+  DEBUG=True
 
-  # Tabular output (perform FDR correction directly rather than relying on topTags to do it for us)
-  edge.out = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
+  # Keep dataset small while testing
+  if(DEBUG):
+    count_data=count_data.head(n=2000)
 
-  nDEGs = nrow(subset(edge.out,padj<0.05))
-  save(nDEGs,file = "nDEGs.RData")
-  write.csv(edge.out, file="edger_table.csv", row.names = T)
+  # Transpose (sklearn expects to find samples as rows and features as columns)
+  count_data = count_data.transpose()
+
+  # Apply a scaler 
+  scaler = preprocessing.StandardScaler().fit(count_data)
+  count_data_scaled = scaler.transform(count_data)
+
+  # Switch to numeric encodings
+  # (TODO: It would be nice if these were ordered with reference level = 0)
+  samplesheet['phenotype'] = preprocessing.LabelEncoder().fit_transform(samplesheet.phenotype)
+
+  # Rename to fit sklearn conventions
+  X,y = count_data_scaled,samplesheet.phenotype
+
+  # Setup classification and RFE parameters
+  clf = SVC(kernel='linear')
+  cv = StratifiedKFold(5)
+  step = 100
+  rfecv = RFECV(
+      estimator=clf,
+      step=step,
+      cv=cv,
+      scoring="accuracy",
+      min_features_to_select=1,
+      n_jobs=-1,
+      verbose=2
+  )
+
+  # Run FRFECV (this may take a while depending on number of features (higher = longer),
+  # cv (higher = longer), step size (higher = shorter))
+  rfecv.fit(X, y)
+
+  # Get outputs
+  print(f"Optimal number of features: {rfecv.n_features_}")
+  # Get the names of the selected features
+  DEG_indices = rfecv.get_support(indices=True)
+  DEGnames = count_data.axes[1][DEG_indices].tolist()
+
+  # Write list of DEG names
+  pd.DataFrame(data={"DEGs": DEGnames}).to_csv("./svc_table.csv",sep =',',index=False)
+
   """
 }
+
+
+
+
 
 process QUASI_PLOTS {
 
@@ -251,24 +268,26 @@ workflow {
   //Basic analysis for each method
   DESEQ_BASIC(CLEANINPUTS.out)
   EDGER_BASIC(CLEANINPUTS.out)
-  WILCOX_BASIC(CLEANINPUTS.out)
-  WILCOX_BASIC.out.view()
+  WILCOXON_BASIC(CLEANINPUTS.out)
+  SVC_BASIC(CLEANINPUTS.out)
 
   ////Permutation analysis with no true signal
   perms = Channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
   // For DESeq
   DESEQ_PERMUTE(DATA_PERMUTE.out)
-  DESEQ_PERMUTE.out.nDEGs
   // For edgeR
   EDGER_PERMUTE(DATA_PERMUTE.out)
-  EDGER_PERMUTE.out.nDEGs
+  // For Wilcoxon
+  WILCOXON_PERMUTE(DATA_PERMUTE.out)
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out.table,
     DESEQ_PERMUTE.out.nDEGs.collect(),
     EDGER_BASIC.out,
-    EDGER_PERMUTE.out.nDEGs.collect()
+    EDGER_PERMUTE.out.nDEGs.collect(),
+    WILCOXON_BASIC.out,
+    WILCOXON_PERMUTE.out.nDEGs.collect()
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
