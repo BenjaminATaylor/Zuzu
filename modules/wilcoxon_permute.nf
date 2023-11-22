@@ -40,7 +40,7 @@ process WILCOXON_PERMUTE{
 
   nDEGs = length(which(wilcox.padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  write.csv(wilcox.padj, file = "wilcox_table.csv")
+  write.csv(wilcox.padj, row.names = TRUE, file = "wilcox_table.csv")
   """
 }
 

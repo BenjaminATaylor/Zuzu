@@ -5,6 +5,7 @@ process PERMUTE_HISTS{
   input: 
   val deseq_infiles
   val edger_infiles
+  val wilcox_infiles
 
   output:
   path 'permute_hist.pdf'
@@ -37,8 +38,14 @@ process PERMUTE_HISTS{
     list_cbind() %>%
     rowSums()
 
-  permhist.in = cbind(deseq.permdegs,edger.permdegs) %>%
-    `colnames<-`(c("DESeq2","edgeR")) %>%
+  wilcox.inlist = str_remove_all("$wilcox_infiles","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+  wilcox.permdegs = lapply(wilcox.inlist,readfun) %>% 
+    list_cbind() %>%
+    rowSums()
+
+  permhist.in = cbind(deseq.permdegs,edger.permdegs,wilcox.permdegs) %>%
+    `colnames<-`(c("DESeq2","edgeR","Wilcoxon")) %>%
     melt()
 
   # Generate breaks contingent on number of reps

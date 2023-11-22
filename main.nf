@@ -73,7 +73,7 @@ process WILCOXON_BASIC{
     data.frame() %>%
     `colnames<-`("padj")
 
-  write.csv(wilcox.padj, file = "wilcox_table.csv")
+  write.csv(wilcox.padj, row.names = TRUE, file = "wilcox_table.csv")
   """
 }
 
@@ -291,7 +291,8 @@ workflow {
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
-    EDGER_PERMUTE.out.outfile.collect()
+    EDGER_PERMUTE.out.outfile.collect(),
+    WILCOXON_PERMUTE.out.outfile.collect()
   )
 
   //Quasi-permutation analysis with partial true signal retained
