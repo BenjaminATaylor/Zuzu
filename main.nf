@@ -5,10 +5,12 @@ include { CLEANINPUTS } from './modules/cleaninputs.nf'
 include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { EDGER_BASIC } from './modules/edger_basic.nf'
+include { WILCOXON_BASIC } from './modules/wilcoxon_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
 include { EDGER_PERMUTE } from './modules/edger_permute.nf'
 include { WILCOXON_PERMUTE } from './modules/wilcoxon_permute.nf'
+include { SVC_PERMUTE } from './modules/svc_permute.nf'
 include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
@@ -32,51 +34,6 @@ println("Reference level: " + ch_reflevel)
 
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
-
-process WILCOXON_BASIC{
-
-  input: 
-  tuple path(samplesheet), path(countsframe) 
-
-  output:
-  path "wilcox_table.csv"
-
-  script:
-  """
-  #!/usr/bin/env Rscript
-  library("edgeR") 
-  library("tidyverse")
-
-  # Input data
-  samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = F)
-  reflevel = "$params.reflevel"
-
-  ##Use edgeR by TMM normalization and transfer to CPM (Counts Per Million)
-  countsframe.dge = DGEList(counts=countsframe.clean,group=samplesheet\$phenotype)
-  countsframe.dge = calcNormFactors(countsframe.dge,method="TMM")
-  countsframe.dge = cpm(countsframe.dge) %>% as.data.frame()
-  allgenes = row.names(countsframe.dge)
-
-  # Split data into ref and alt counts
-  refcounts = select(countsframe.dge, subset(samplesheet, phenotype == reflevel)\$sample)
-  altcounts = select(countsframe.dge, subset(samplesheet, phenotype != reflevel)\$sample)
-  # Run wilcox tests on each gene
-  gene.wilcox = function(x){
-    this.wilcox = wilcox.test(as.numeric(refcounts[x,]), as.numeric(altcounts[x,]))
-    return(this.wilcox\$p.value)
-  }
-  wilcox.p = sapply(allgenes, gene.wilcox)
-  # Adjust to FDR
-  wilcox.padj = p.adjust(wilcox.p,method = "BH") %>% 
-    `names<-`(allgenes) %>% 
-    data.frame() %>%
-    `colnames<-`("padj")
-
-  write.csv(wilcox.padj, row.names = TRUE, file = "wilcox_table.csv")
-  """
-}
-
 
 process SVC_BASIC{
 
@@ -280,6 +237,9 @@ workflow {
   EDGER_PERMUTE(DATA_PERMUTE.out)
   // For Wilcoxon
   WILCOXON_PERMUTE(DATA_PERMUTE.out)
+  // For SVC
+  SVC_PERMUTE(DATA_PERMUTE.out)
+  SVC_PERMUTE.out.nDEGs.view()
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out.table,
@@ -287,7 +247,9 @@ workflow {
     EDGER_BASIC.out,
     EDGER_PERMUTE.out.nDEGs.collect(),
     WILCOXON_BASIC.out,
-    WILCOXON_PERMUTE.out.nDEGs.collect()
+    WILCOXON_PERMUTE.out.nDEGs.collect(),
+    SVC_BASIC.out,
+    SVC_PERMUTE.out.nDEGs.collect(),
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
