@@ -107,9 +107,12 @@ process SVC_BASIC{
   DEG_indices = rfecv.get_support(indices=True)
   DEGnames = count_data.axes[1][DEG_indices].tolist()
 
-  # Write list of DEG names
-  pd.DataFrame(data={"DEGs": DEGnames}).to_csv("./svc_table.csv",sep =',',index=False)
-
+  # Write DEG output to table
+  allgenes=pd.DataFrame(count_data.axes[1].to_list())
+  genescores = allgenes.isin(DEGnames).astype('int')
+  outframe = pd.concat([allgenes,genescores], axis=1)
+  outframe.columns = ['gene', 'DEGstatus']
+  outframe.to_csv("./svc_table.csv",sep =',',index=False)
   """
 }
 
@@ -239,7 +242,6 @@ workflow {
   WILCOXON_PERMUTE(DATA_PERMUTE.out)
   // For SVC
   SVC_PERMUTE(DATA_PERMUTE.out)
-  SVC_PERMUTE.out.nDEGs.view()
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out.table,
@@ -254,7 +256,8 @@ workflow {
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_PERMUTE.out.outfile.collect(),
-    WILCOXON_PERMUTE.out.outfile.collect()
+    WILCOXON_PERMUTE.out.outfile.collect(),
+    SVC_PERMUTE.out.outfile.collect()
   )
 
   //Quasi-permutation analysis with partial true signal retained

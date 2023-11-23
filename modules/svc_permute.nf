@@ -73,8 +73,12 @@ process SVC_PERMUTE{
     with open('nDEGs.txt','w') as out:
         out.write(f"{rfecv.n_features_}\\n")
         out.close()
-    
-    # Write list of DEG names
-    pd.DataFrame(data={"DEGs": DEGnames}).to_csv("./svc_table.csv",sep =',',index=False)
+
+    # Write output frame with all genes and their DEG status (1=DEG)
+    allgenes=pd.DataFrame(count_data.axes[1].to_list())
+    genescores = allgenes.isin(DEGnames).astype('int')
+    outframe = pd.concat([allgenes,genescores], axis=1)
+    outframe.columns = ['gene', 'DEGstatus']
+    outframe.to_csv("./svc_table.csv",sep =',',index=False)
     """
 }

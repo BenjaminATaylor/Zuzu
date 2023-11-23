@@ -1,6 +1,6 @@
 process PERMUTE_PLOTS{
 
-  debug true
+  debug false
 
   publishDir "$params.outdir"
 
@@ -61,12 +61,11 @@ process PERMUTE_PLOTS{
   wilcox.permute.input =  data.frame(method = "wilcox", 
                                     nDEGs = wilcox.ndegs, 
                                     permutes = wilcox.perms)
-  print(wilcox.permute.input)
   
   ## SVC inputs
   # DEGs from full model
-  SVC.table = read.csv("$SVC_table")
-  SVC.ndegs = nrow(SVC.table)
+  SVC.table = read.csv("$SVC_table", row.names = 1)
+  SVC.ndegs = nrow(subset(SVC.table, DEGstatus==1))
   # Permutations
   SVC.inlist = str_remove_all("$SVC_perms","[\\\\[\\\\] ]") %>% 
     strsplit(split = ",") %>% unlist()
@@ -75,7 +74,6 @@ process PERMUTE_PLOTS{
   SVC.permute.input =  data.frame(method = "SVC", 
                                   nDEGs = SVC.ndegs, 
                                   permutes = SVC.perms)
-  print(SVC.permute.input)
 
   # Combined inputs for plotting
   permuteplot.input = rbind(deseq.permute.input,

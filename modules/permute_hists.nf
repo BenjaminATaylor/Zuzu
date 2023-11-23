@@ -6,6 +6,7 @@ process PERMUTE_HISTS{
   val deseq_infiles
   val edger_infiles
   val wilcox_infiles
+  val SVC_infiles
 
   output:
   path 'permute_hist.pdf'
@@ -16,13 +17,19 @@ process PERMUTE_HISTS{
   library("tidyverse", quietly = TRUE)
   library("reshape2", quietly = TRUE)
 
-  #print("$deseq_infiles")
-  #print("$edger_infiles")
   nperms = as.numeric("$params.nperms")
 
+  # Function to read in tables produced by R
   readfun = function(x){
     res <- read.csv(x,row.names = 1)
     df <- data.frame(result = (res\$padj<0.05), row.names = row.names(res))
+    return(df)
+  }
+
+  # Function to read in files produced by Python
+  pythout_readfun = function(x){
+    res <- read.csv(x,row.names = 1)
+    df <- data.frame(result = (res\$DEGstatus==1), row.names = row.names(res))
     return(df)
   }
 
@@ -44,8 +51,21 @@ process PERMUTE_HISTS{
     list_cbind() %>%
     rowSums()
 
-  permhist.in = cbind(deseq.permdegs,edger.permdegs,wilcox.permdegs) %>%
-    `colnames<-`(c("DESeq2","edgeR","Wilcoxon")) %>%
+  SVC.inlist = str_remove_all("$SVC_infiles","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+  SVC.permdegs = lapply(SVC.inlist,pythout_readfun) %>% 
+    list_cbind() %>%
+    rowSums()
+
+
+  permhist.in = cbind(deseq.permdegs,
+                      edger.permdegs,
+                      wilcox.permdegs,
+                      SVC.permdegs) %>%
+    `colnames<-`(c("DESeq2",
+                    "edgeR",
+                    "Wilcoxon",
+                    "SVC")) %>%
     melt()
 
   # Generate breaks contingent on number of reps
