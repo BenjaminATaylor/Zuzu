@@ -10,7 +10,7 @@ process DESEQ_BASIC{
   script:
   """
   #!/usr/bin/env Rscript
-  library("tidyverse",deseq_table, quietly = TRUE)
+  library("tidyverse", quietly = TRUE)
   library("DESeq2", quietly = TRUE)
 
   samplesheet = read.csv("$samplesheet")

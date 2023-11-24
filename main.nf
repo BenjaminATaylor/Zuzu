@@ -6,6 +6,7 @@ include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { EDGER_BASIC } from './modules/edger_basic.nf'
 include { WILCOXON_BASIC } from './modules/wilcoxon_basic.nf'
+include { SVC_BASIC } from './modules/svc_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
 include { EDGER_PERMUTE } from './modules/edger_permute.nf'
@@ -17,6 +18,8 @@ include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
 include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
+include { WILCOXON_QUASI } from './modules/wilcoxon_quasi.nf'
+include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
 
 //exit 1, 'DEBUG'
 
@@ -35,90 +38,6 @@ println("Reference level: " + ch_reflevel)
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
 
-process SVC_BASIC{
-
-  //debug true
-  
-  input: 
-  tuple path(samplesheet), path(countsframe) 
-
-  output:
-  path "svc_table.csv"
-
-  script:
-  """
-  #!/usr/bin/env python3
-  import pandas as pd
-  import numpy as np
-  import os
-  import csv
-
-  from sklearn import preprocessing
-  from sklearn.feature_selection import RFECV
-  from sklearn.svm import SVC
-  from sklearn.model_selection import StratifiedKFold
-
-  # Input data
-  # Reading the Dataset
-  count_data=pd.read_table('$countsframe',sep=',',index_col=0) 
-  samplesheet=pd.read_csv('$samplesheet')
-
-  DEBUG=True
-
-  # Keep dataset small while testing
-  if(DEBUG):
-    count_data=count_data.head(n=2000)
-
-  # Transpose (sklearn expects to find samples as rows and features as columns)
-  count_data = count_data.transpose()
-
-  # Apply a scaler 
-  scaler = preprocessing.StandardScaler().fit(count_data)
-  count_data_scaled = scaler.transform(count_data)
-
-  # Switch to numeric encodings
-  # (TODO: It would be nice if these were ordered with reference level = 0)
-  samplesheet['phenotype'] = preprocessing.LabelEncoder().fit_transform(samplesheet.phenotype)
-
-  # Rename to fit sklearn conventions
-  X,y = count_data_scaled,samplesheet.phenotype
-
-  # Setup classification and RFE parameters
-  clf = SVC(kernel='linear')
-  cv = StratifiedKFold(5)
-  step = 100
-  rfecv = RFECV(
-      estimator=clf,
-      step=step,
-      cv=cv,
-      scoring="accuracy",
-      min_features_to_select=1,
-      n_jobs=-1,
-      verbose=2
-  )
-
-  # Run FRFECV (this may take a while depending on number of features (higher = longer),
-  # cv (higher = longer), step size (higher = shorter))
-  rfecv.fit(X, y)
-
-  # Get outputs
-  print(f"Optimal number of features: {rfecv.n_features_}")
-  # Get the names of the selected features
-  DEG_indices = rfecv.get_support(indices=True)
-  DEGnames = count_data.axes[1][DEG_indices].tolist()
-
-  # Write DEG output to table
-  allgenes=pd.DataFrame(count_data.axes[1].to_list())
-  genescores = allgenes.isin(DEGnames).astype('int')
-  outframe = pd.concat([allgenes,genescores], axis=1)
-  outframe.columns = ['gene', 'DEGstatus']
-  outframe.to_csv("./svc_table.csv",sep =',',index=False)
-  """
-}
-
-
-
-
 
 process QUASI_PLOTS {
 
@@ -127,6 +46,7 @@ process QUASI_PLOTS {
   input:
   val deseq_quasis
   val edger_quasis
+  val wilcox_quasis
 
   output:
   path "quasi_plot.pdf"
@@ -160,7 +80,21 @@ process QUASI_PLOTS {
     mutate(method = "edgeR") %>% 
     melt(id.vars = c("method","samplenum"))
 
-  gg.quasi.input = rbind(deseq.quasi.input, edger.quasi.input)
+  wilcox.inlist = str_remove_all("$wilcox_quasis","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+
+  wilcox.quasi.input = 
+    sapply(wilcox.inlist, read.csv) %>% 
+    t() %>% 
+    `row.names<-`(NULL) %>% 
+    data.frame() %>%
+    mutate_all(as.numeric) %>%
+    mutate(method = "wilcox") %>% 
+    melt(id.vars = c("method","samplenum"))
+
+  gg.quasi.input = rbind(deseq.quasi.input, 
+                          edger.quasi.input,
+                          wilcox.quasi.input)
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
@@ -270,11 +204,14 @@ workflow {
   DESEQ_QUASI(DESEQ_DATA_QUASI.out)
   EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   EDGER_QUASI(EDGER_DATA_QUASI.out)
+  WILCOXON_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+  WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
 
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),
-    EDGER_QUASI.out.collect()
+    EDGER_QUASI.out.collect(),
+    WILCOXON_QUASI.out.collect()
   )
 
 }
