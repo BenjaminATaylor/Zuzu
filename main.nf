@@ -20,6 +20,8 @@ include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 include { WILCOXON_QUASI } from './modules/wilcoxon_quasi.nf'
 include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
+include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
+
 
 //exit 1, 'DEBUG'
 
@@ -194,24 +196,23 @@ workflow {
     SVC_PERMUTE.out.outfile.collect()
   )
 
-  //Quasi-permutation analysis with partial true signal retained
-  //samplenums = Channel.from(breaks)
-  //amplenums.subscribe { println "DEBUG: $it" }
-
-  //perms.combine(breaks).view()
-
+  // Quasi-permutation analysis with partial true signal retained
   DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   DESEQ_QUASI(DESEQ_DATA_QUASI.out)
   EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   EDGER_QUASI(EDGER_DATA_QUASI.out)
   WILCOXON_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
-
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),
     EDGER_QUASI.out.collect(),
     WILCOXON_QUASI.out.collect()
   )
+
+  // Synthetic analysis, allowing us to define known true DEGs
+  DATA_FULLSYNTH(perms.combine(breaks))
+  DATA_FULLSYNTH.out.view()
+
 
 }
