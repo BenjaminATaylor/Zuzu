@@ -21,6 +21,10 @@ include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 include { WILCOXON_QUASI } from './modules/wilcoxon_quasi.nf'
 include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
 include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
+include { DESEQ_FULLSYNTH } from './modules/deseq_fullsynth.nf'
+include { EDGER_FULLSYNTH } from './modules/edger_fullsynth.nf'
+include { FULLSYNTH_PLOTS } from './modules/fullsynth_plots.nf'
+
 
 
 //exit 1, 'DEBUG'
@@ -212,7 +216,11 @@ workflow {
 
   // Synthetic analysis, allowing us to define known true DEGs
   DATA_FULLSYNTH(perms.combine(breaks))
-  DATA_FULLSYNTH.out.view()
 
+  DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
+  EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
+
+  FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out,
+                  EDGER_FULLSYNTH.out)
 
 }

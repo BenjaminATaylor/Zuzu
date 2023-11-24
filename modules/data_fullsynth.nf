@@ -7,7 +7,8 @@ process DATA_FULLSYNTH{
     tuple path("depth.RData"), 
             path("trueDEGs.RData"), 
             path("synthsheet.csv"), 
-            path("synthcounts.csv")
+            path("synthcounts.csv"),
+            val(refnum)
 
     script:
     """
