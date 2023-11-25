@@ -23,6 +23,7 @@ include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
 include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
 include { DESEQ_FULLSYNTH } from './modules/deseq_fullsynth.nf'
 include { EDGER_FULLSYNTH } from './modules/edger_fullsynth.nf'
+include { WILCOXON_FULLSYNTH } from './modules/wilcoxon_fullsynth.nf'
 include { FULLSYNTH_PLOTS } from './modules/fullsynth_plots.nf'
 
 
@@ -219,8 +220,11 @@ workflow {
 
   DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
   EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
+  WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
+
 
   FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out,
-                  EDGER_FULLSYNTH.out)
+                  EDGER_FULLSYNTH.out,
+                  WILCOXON_FULLSYNTH.out)
 
 }

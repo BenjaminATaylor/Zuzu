@@ -5,6 +5,7 @@ process FULLSYNTH_PLOTS {
   input:
   val deseq_synths
   val edger_synths
+  val wilcox_synths
 
 
   output:
@@ -39,20 +40,21 @@ process FULLSYNTH_PLOTS {
     mutate(method = "edgeR") %>% 
     melt(id.vars = c("method","samplenum"))
 
-    #  wilcox.inlist = str_remove_all("wilcox_synths","[\\\\[\\\\] ]") %>% 
-    #    strsplit(split = ",") %>% unlist()
-    #
-    #  wilcox.synth.input = 
-    #    sapply(wilcox.inlist, read.csv) %>% 
-    #    t() %>% 
-    #    `row.names<-`(NULL) %>% 
-    #    data.frame() %>%
-    #    mutate_all(as.numeric) %>%
-    #    mutate(method = "wilcox") %>% 
-    #    melt(id.vars = c("method","samplenum"))
+    wilcox.inlist = str_remove_all("$wilcox_synths","[\\\\[\\\\] ]") %>% 
+        strsplit(split = ",") %>% unlist()
+
+    wilcox.synth.input = 
+        sapply(wilcox.inlist, read.csv) %>% 
+        t() %>% 
+        `row.names<-`(NULL) %>% 
+        data.frame() %>%
+        mutate_all(as.numeric) %>%
+        mutate(method = "wilcox") %>% 
+        melt(id.vars = c("method","samplenum"))
 
   gg.synth.input = rbind(deseq.synth.input, 
-                          edger.synth.input)
+                          edger.synth.input,
+                          wilcox.synth.input)
 
   gg.synth = ggplot(gg.synth.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
