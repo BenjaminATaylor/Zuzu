@@ -229,6 +229,4 @@ workflow {
                   EDGER_FULLSYNTH.out.collect(),
                   WILCOXON_FULLSYNTH.out.collect())
 
-  perms.combine(breaks).combine(depths).view()
-
 }
