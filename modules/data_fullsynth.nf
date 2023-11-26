@@ -1,10 +1,10 @@
 process DATA_FULLSYNTH{
 
     input: 
-    tuple val(x), val(refnum), val(altnum)
+    tuple val(x), val(refnum), val(altnum), val(depth)
 
     output:
-    tuple path("depth.RData"), 
+    tuple val(depth),
             path("trueDEGs.RData"), 
             path("synthsheet.csv"), 
             path("synthcounts.csv"),
@@ -18,7 +18,7 @@ process DATA_FULLSYNTH{
 
     set.seed($x)
     refnum = $refnum
-    depth = 1e7
+    depth = $depth
 
     # if we wanted to, we could include uneven sample sizes- this to be added in future if desired
     # check which of the two sample sizes is larger
@@ -50,7 +50,6 @@ process DATA_FULLSYNTH{
     truedegs = row.names(subset(synthdata@variable.annotations, differential.expression == 1))
 
     # save outputs
-    save(depth, file="depth.RData")
     save(truedegs, file="trueDEGs.RData")
     write.csv(synthdata.metadata, file="synthsheet.csv")
     write.csv(synthdata.counts, file="synthcounts.csv")

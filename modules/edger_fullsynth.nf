@@ -1,7 +1,7 @@
 process EDGER_FULLSYNTH{
 
     input:
-    tuple path(depth), //"depth.RData"
+    tuple val(depth), 
           path(truedegs), //"trueDEGs.RData"
           path(samplesheet), //"synthsheet.csv"
           path(countsframe), //"synthcounts.csv"
@@ -21,7 +21,7 @@ process EDGER_FULLSYNTH{
     countsframe = read.csv("$countsframe", row.names = 1, check.names = F)
     samplenum = $refnum
     truedegs = get(load("$truedegs"))
-    depth = get(load("$depth"))
+    depth = $depth
 
     # Run edgeR for this dataset
     dds.edge = DGEList(counts=countsframe,group=samplesheet\$phenotype)

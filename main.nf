@@ -45,6 +45,8 @@ println("Reference level: " + ch_reflevel)
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
 
+// Set a vector of depths across which to generate fullsynth datasets
+depths = Channel.from(1e5, 1e6, 1e7)
 
 process QUASI_PLOTS {
 
@@ -216,15 +218,17 @@ workflow {
   )
 
   // Synthetic analysis, allowing us to define known true DEGs
-  DATA_FULLSYNTH(perms.combine(breaks))
+  DATA_FULLSYNTH(perms.combine(breaks).combine(depths))
 
   DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
   EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
   WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
 
 
-  FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out,
-                  EDGER_FULLSYNTH.out,
-                  WILCOXON_FULLSYNTH.out)
+  FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out.collect(),
+                  EDGER_FULLSYNTH.out.collect(),
+                  WILCOXON_FULLSYNTH.out.collect())
+
+  perms.combine(breaks).combine(depths).view()
 
 }
