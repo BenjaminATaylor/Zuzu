@@ -24,9 +24,9 @@ include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
 include { DESEQ_FULLSYNTH } from './modules/deseq_fullsynth.nf'
 include { EDGER_FULLSYNTH } from './modules/edger_fullsynth.nf'
 include { WILCOXON_FULLSYNTH } from './modules/wilcoxon_fullsynth.nf'
+include { SVC_FULLSYNTH } from './modules/svc_fullsynth.nf'
+include { SVC_FULLSYNTH_POSTPROCESS } from './modules/svc_fullsynth_postprocess.nf'
 include { FULLSYNTH_PLOTS } from './modules/fullsynth_plots.nf'
-
-
 
 //exit 1, 'DEBUG'
 
@@ -223,10 +223,12 @@ workflow {
   DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
   EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
   WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
-
+  SVC_FULLSYNTH(DATA_FULLSYNTH.out)
+  SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
 
   FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out.collect(),
                   EDGER_FULLSYNTH.out.collect(),
-                  WILCOXON_FULLSYNTH.out.collect())
+                  WILCOXON_FULLSYNTH.out.collect(),
+                  SVC_FULLSYNTH_POSTPROCESS.out.collect())
 
 }
