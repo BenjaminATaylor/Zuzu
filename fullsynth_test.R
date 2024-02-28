@@ -3,11 +3,10 @@ library(tidyverse)
 
 setwd("/Users/benjamin/Repositories/Zuzu/")
 
-set.seed()
-
+set.seed(123)
 
 refnum = 30
-altnum = 20
+altnum = 30
 depth = 1e7
 
 # check which of the two sample sizes is larger
@@ -19,10 +18,11 @@ bignum; smallnum
 
 # generate synthetic data
 # TODO: adjust parameters based on the real input data 
-synthdata = generateSyntheticData(dataset = "testset_1", n.vars = 2000, 
+synthdata = generateSyntheticData(dataset = "qkwnqiuh", n.vars = 1000, 
                                   samples.per.cond = bignum, n.diffexp = 200, 
                                   repl.id = 1, seqdepth = depth, 
-                                  fraction.upregulated = 0.5, 
+                                  fraction.upregulated = 0.5,
+                                  #effect.size = c(rep(1,200),rep(2,800)),
                                   between.group.diffdisp = FALSE, 
                                   filter.threshold.total = 10, 
                                   filter.threshold.mediancpm = 0, 
@@ -30,9 +30,6 @@ synthdata = generateSyntheticData(dataset = "testset_1", n.vars = 2000,
                                   output.file = NULL)
 
 params.reflevel = "foo"
-
-
-
 
 # clean data, and change condition names to include our specified reference level
 synthdata.counts = synthdata@count.matrix
@@ -43,17 +40,23 @@ synthdata.metadata =
   tibble::rownames_to_column(var = "sample") %>%
   select(-c("depth.factor","condition"))
 
+# Plot to check that counts look the way we expect
+synthdata.counts.scale = t(apply(synthdata.counts,1,scale)) %>% `colnames<-`(colnames(synthdata.counts)) 
+absdiffs = rowMeans(synthdata.counts.scale[,1:30])-rowMeans(synthdata.counts.scale[,31:60])
+ggplot(data.frame(diffs = absdiffs, index = 1:length(absdiffs)), aes(x = index, y = diffs)) +
+  geom_point()
+
+rowMeans(synthdata.counts.scale[,1:30])[500] - rowMeans(synthdata.counts.scale[,31:60])[500]
+
+
 # extract names of true DEGs
 truedegs = row.names(subset(synthdata@variable.annotations, differential.expression == 1))
-
-
 
 # save outputs
 save(depth, file="depth.RData")
 save(truedegs, file="trueDEGs.RData")
-write.csv(synthdata.metadata, file="synthsheet.csv")
-write.csv(synthdata.counts, file="synthcounts.csv")
-
+write.csv(synthdata.metadata, file="input/synthtest/synth_sheet.csv")
+write.csv(synthdata.counts, file="input/synthtest/synth_counts.csv")
 
 # basic DESeq2 design
 dds.gene = DESeqDataSetFromMatrix(countData = synthdata.counts,
@@ -73,16 +76,16 @@ thesedegs = row.names(subset(results(dds.gene.deg),padj<0.05))
 # But are they the right genes? Here 1 = true DEG
 truedegs = row.names(subset(synthdata@variable.annotations, differential.expression == 1))
 table(thesedegs %in% truedegs) # Mostly - about 94%
+table(truedegs %in% thesedegs)
 
 # Check group means for a gene
-mean(synthdata.counts[1,1:50])
-mean(synthdata.counts[1,51:100])
+mean(synthdata.counts[1,1:30])
+mean(synthdata.counts[1,31:60])
 
 # export so we can use for testing in sklearn
 write.csv(synthdata.counts, file = "input/synthtest/synth_counts.csv")
 write.csv(synthdata.metadata, file = "input/synthtest/synth_metadata.csv")
 write.csv(synthdata@variable.annotations, file = "input/synthtest/synth_annotations.csv")
-
 
 # Okay, we're actually having some issues over with sklearn 
 # I suspect that the artificially low dispersions of non-DE genes relative to the strength of DE might be the issue?

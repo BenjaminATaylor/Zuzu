@@ -5,15 +5,53 @@ library(pracma) # for movavg
 
 setwd("/Users/benjamin/Repositories/Zuzu/")
 
-data.y = read.csv(file = "test_y.csv", col.names = c("ID","phenotype"))
-data.x = read.csv(file = "test_x.csv", row.names = 1) %>% t()
+# Do we want to use pre-scaled data to match Python's scaling?
+prenormalized = F
+informativefeatures = 200
 
-readcounts = data.x
-traindata = data.y
-testdata = NA
-crossfold = 5
-referencelevel = 0
-kerneltype = "radial"
+# Read in data (either pre-scaled or 'raw')
+data.y = read.csv(file = "test_y.csv", col.names = c("ID","phenotype"))
+if(prenormalized){
+  data.x = read.csv(file = "test_x_transform.csv", row.names = 1) %>% t()
+} else {
+  data.x = read.csv(file = "test_x.csv", row.names = 1) %>% t()
+}
+
+# ALternatively, read in genesynth data for testing
+# data.y = read.csv("synthsheet.csv", col.names = c("ID","phenotype")) %>% 
+#   mutate(phenotype = as.numeric(as.factor(phenotype))-1)
+# data.x = read.csv("synthcounts.csv", row.names = 1)
+
+
+#Alternatively, read tumor data for testing
+data.y = read.csv("input/test4/tumorcleandata.csv", col.names = c("ID","phenotype")) %>%
+  mutate(phenotype = as.numeric(as.factor(phenotype))-1)
+data.x = read.csv("input/test4/tumorcleancounts.csv", row.names = 1)
+
+
+# NB here we can visually check that the first X features are the meaningful ones, as expected
+data.x0 = data.x[,which(data.y$phenotype==0)]
+data.x1 = data.x[,which(data.y$phenotype==1)]
+foo = rowSums(data.x0) - rowSums(data.x1)
+plot(foo) # for the gene expression data, I guess part of the issue must be the overdispersion of certain genes. If that's the case, it'd be worth seeing what this looks like when scaled and taking means
+data.x.scale = t(apply(data.x,1,scale)) %>% `colnames<-`(colnames(data.x)) 
+data.x0 = data.x.scale[,which(data.y$phenotype==0)]
+data.x1 = data.x.scale[,which(data.y$phenotype==1)]
+foo = abs(rowMeans(data.x0) - rowMeans(data.x1))
+plot(foo)
+data.x = data.x.scale ; prenormalized = T
+# Oookay so these values are higher than expected given the parameters we used, I think?
+
+# Note which features are the informative ones
+truefeatures = row.names(data.x)[1:informativefeatures]
+
+# data for manual testing
+# readcounts = data.x
+# traindata = data.y
+# testdata = NA
+# crossfold = 5
+# referencelevel = 0
+# kerneltype = "radial"
 
 #### Define SVM function
 svm.train = function(readcounts, traindata, testdata = NA, referencelevel = 0, kerneltype = "radial", crossfold = 5, vstCheck = T){
@@ -39,12 +77,12 @@ svm.train = function(readcounts, traindata, testdata = NA, referencelevel = 0, k
                                train.x = t(svm.counts.train),
                                train.y = as.numeric(traindata$phenotype == referencelevel),
                                probability = TRUE, 
-                               scale = TRUE,
+                               scale = !(prenormalized),
                                kernel = kerneltype,
                                tunecontrol = tune.control(sampling = "cross",
                                                           cross = crossfold),
-                               ranges = list(gamma = 10^(-7:-5),
-                                             cost = 2^(3:5))
+                               ranges = list(gamma = 10^(-6:-6),
+                                             cost = 2^(4:4))
   )
   
   # Final classifier
@@ -115,7 +153,7 @@ while(nfeatures > nfeatures_target){
                                  kernel = "radial", 
                                  tunecontrol = tune.control(sampling = "cross", 
                                                             cross = 3),
-                                 ranges = list(gamma = 10^(-5:-7), cost = 2^(4:6)))
+                                 ranges = list(gamma = 10^(-7:-6), cost = 2^(5:6)))
     #record error
     error = c(error, svm.counts.tuneResult$best.performance)
   }
@@ -144,10 +182,19 @@ if(use_movavg){moving_avg = movavg(iterations$error_before_removal, 3, "s") }
 
 # plot data to ensure we have the expected 'hockeystick' shape 
 error = if(use_movavg){ moving_avg } else { iterations$error_before_removal }
-hockeyData = data.frame(num = iterLength, error = error)
+
+hockeyData = data.frame(num = iterLength, error = error, truefeature = (iterations$feature %in% truefeatures))
 hockeyData_plot = hockeyData
 hockeyData_plot$num = abs(iterLength - (max(iterLength)+1))
-plot(hockeyData_plot$num,hockeyData_plot$error, xlim = rev(c(0, length(hockeyData_plot$error)+5)))
+
+ggplot(hockeyData_plot, aes(x = num, y = error, colour = truefeature)) +
+  geom_point() +
+  scale_x_reverse() +
+  scale_colour_manual(values = c("Black","Red")) +
+  theme_bw()
+
+plot(hockeyData_plot$num,hockeyData_plot$error,colour = hockeyData_plot$feature,
+     xlim = rev(c(0, length(hockeyData_plot$error)+5)))
 
 
 

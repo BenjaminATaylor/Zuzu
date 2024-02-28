@@ -7,9 +7,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
 
-nfeatures = 15
-ninformative = 3
-sep = 0.8
+nfeatures = 1000
+ninformative = 200
+sep = 0.4
 #nclasses = 2
 scale = False # This is actually redundant at the moment since make_classification produces normalized data anyway
 
@@ -31,18 +31,18 @@ for nclasses in classarray:
     )
 
     ## save simulated data for R testing
-    #dfy,dfx = pd.DataFrame(y),pd.DataFrame(X)
-    #dfy.to_csv('test_y.csv') 
-    #dfx.to_csv('test_x.csv') 
-    #X.all
-    #
-    ## Standardize the features
-    #scaler = StandardScaler()
-    #X = scaler.fit_transform(X)
-    #
-    ## also save the scaled version for testing purposes
-    #dfy,dfx = pd.DataFrame(y),pd.DataFrame(X)
-    #dfx.to_csv('test_x_transform.csv') 
+    dfy,dfx = pd.DataFrame(y),pd.DataFrame(X)
+    dfy.to_csv('test_y.csv') 
+    dfx.to_csv('test_x.csv') 
+    X.all
+    
+    # Standardize the features
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+    
+    # also save the scaled version for testing purposes
+    dfy,dfx = pd.DataFrame(y),pd.DataFrame(X)
+    dfx.to_csv('test_x_transform.csv') 
 
 
     # Train an SVC model with a linear kernel on the entire dataset
