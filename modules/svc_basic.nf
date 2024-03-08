@@ -2,11 +2,15 @@ process SVC_BASIC{
 
   //debug true
   
+  publishDir "$params.outdir/svctables", pattern: 'svc_basic_fs.png'
+  //publishDir ".", pattern: 'svc_table.csv'
+  
   input: 
   tuple path(samplesheet), path(countsframe) 
 
   output:
-  path "svc_table.csv"
+  path "svc_table.csv", emit: table
+  path "svc_basic_fs.png"
 
   script:
   """
@@ -15,6 +19,7 @@ process SVC_BASIC{
   import numpy as np
   import os
   import csv
+  import matplotlib.pyplot as plt
 
   from sklearn import preprocessing
   from sklearn.feature_selection import RFECV
@@ -30,7 +35,7 @@ process SVC_BASIC{
 
   # Keep dataset small while testing
   if(DEBUG):
-    count_data=count_data.head(n=2000)
+    count_data=count_data.head(n=500)
 
   # Transpose (sklearn expects to find samples as rows and features as columns)
   count_data = count_data.transpose()
@@ -76,5 +81,21 @@ process SVC_BASIC{
   outframe = pd.concat([allgenes,genescores], axis=1)
   outframe.columns = ['gene', 'DEGstatus']
   outframe.to_csv("./svc_table.csv",sep =',',index=False)
+    
+  n_scores = len(rfecv.cv_results_["mean_test_score"])
+  plt.figure()
+  plt.xlabel("Number of features selected")
+  plt.ylabel("Mean test accuracy")
+  plt.errorbar(
+      range(1, n_scores + 1),
+      rfecv.cv_results_["mean_test_score"],
+      yerr=rfecv.cv_results_["std_test_score"],
+  )
+  #plt.title(str(nsamples) + " samples and " + str(nfeatures) + " features of which " + str(ninformative) + " informative, with " + str(nclasses) + " classes")
+  plt.savefig("svc_basic_fs.png", format="png")
+  plt.close("all")
+  
+  print("test")
+    
   """
 }

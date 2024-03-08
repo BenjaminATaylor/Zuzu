@@ -88,3 +88,5 @@ for nclasses in classarray:
     )
     plt.title(str(nsamples) + " samples and " + str(nfeatures) + " features of which " + str(ninformative) + " informative, with " + str(nclasses) + " classes")
     plt.savefig('tempfigs/' + classifier + figname + tunereport + ".png")
+
+

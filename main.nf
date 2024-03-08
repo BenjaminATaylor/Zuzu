@@ -193,7 +193,7 @@ workflow {
     EDGER_PERMUTE.out.nDEGs.collect(),
     WILCOXON_BASIC.out,
     WILCOXON_PERMUTE.out.nDEGs.collect(),
-    SVC_BASIC.out,
+    SVC_BASIC.out.table,
     SVC_PERMUTE.out.nDEGs.collect(),
   )
   PERMUTE_HISTS(
