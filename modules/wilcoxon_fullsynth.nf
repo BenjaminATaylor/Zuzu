@@ -5,7 +5,8 @@ process WILCOXON_FULLSYNTH{
           path(truedegs), //"trueDEGs.RData"
           path(samplesheet), //"synthsheet.csv"
           path(countsframe), //"synthcounts.csv"
-          val(refnum)
+          val(refnum),
+          val(x)
 
     output:
     path("outframe.csv")

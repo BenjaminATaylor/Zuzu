@@ -8,7 +8,8 @@ process DATA_FULLSYNTH{
             path("trueDEGs.RData"), 
             path("synthsheet.csv"), 
             path("synthcounts.csv"),
-            val(refnum)
+            val(refnum),
+            val(x)
 
     script:
     """

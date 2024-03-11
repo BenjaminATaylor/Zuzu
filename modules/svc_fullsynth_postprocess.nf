@@ -6,8 +6,8 @@ process SVC_FULLSYNTH_POSTPROCESS{
     tuple val(depth), 
           path(truedegs), //"trueDEGs.RData"
           val(refnum),
-          path(inframe)
-
+          path(inframe),
+          path(plotframe) // Included as input for ease of naming, but not used here 
 
     output:
     path("outframe.csv")

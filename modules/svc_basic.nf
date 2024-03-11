@@ -2,7 +2,7 @@ process SVC_BASIC{
 
   //debug true
   
-  publishDir "$params.outdir/svctables", pattern: 'svc_basic_fs.png'
+  publishDir "$params.outdir/svctables", pattern: '*.png'
   //publishDir ".", pattern: 'svc_table.csv'
   
   input: 
