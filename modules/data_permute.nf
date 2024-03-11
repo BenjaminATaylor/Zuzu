@@ -5,7 +5,8 @@ process DATA_PERMUTE{
   val x
 
   output:
-  tuple path("samplesheet_perm.csv"), path("countsframe_perm.csv")
+  tuple path("samplesheet_perm.csv"), path("countsframe_perm.csv"), emit: frames
+  val x
 
   script:
   """

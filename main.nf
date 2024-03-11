@@ -178,11 +178,11 @@ workflow {
   perms = Channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
   // For DESeq
-  DESEQ_PERMUTE(DATA_PERMUTE.out)
+  DESEQ_PERMUTE(DATA_PERMUTE.out.frames)
   // For edgeR
-  EDGER_PERMUTE(DATA_PERMUTE.out)
+  EDGER_PERMUTE(DATA_PERMUTE.out.frames)
   // For Wilcoxon
-  WILCOXON_PERMUTE(DATA_PERMUTE.out)
+  WILCOXON_PERMUTE(DATA_PERMUTE.out.frames)
   // For SVC
   SVC_PERMUTE(DATA_PERMUTE.out)
   // Combine outputs and plot

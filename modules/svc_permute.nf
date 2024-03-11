@@ -1,11 +1,15 @@
 process SVC_PERMUTE{
 
+     publishDir "$params.outdir/svctables", pattern: '*.png'
+
     input: 
     tuple path(samplesheet), path(countsframe) 
+    val x
 
     output:
     path "svc_table.csv", emit: outfile
     path "nDEGs.txt", emit: nDEGs
+    path "svc_permute_fs_*.png"
 
     script:
     """
@@ -14,6 +18,7 @@ process SVC_PERMUTE{
     import numpy as np
     import os
     import csv
+    import matplotlib.pyplot as plt
 
     from sklearn import preprocessing
     from sklearn.feature_selection import RFECV
@@ -80,5 +85,20 @@ process SVC_PERMUTE{
     outframe = pd.concat([allgenes,genescores], axis=1)
     outframe.columns = ['gene', 'DEGstatus']
     outframe.to_csv("./svc_table.csv",sep =',',index=False)
+    
+    n_scores = len(rfecv.cv_results_["mean_test_score"])
+    plt.figure()
+    plt.xlabel("Number of features selected")
+    plt.ylabel("Mean test accuracy")
+    plt.errorbar(
+        range(1, n_scores + 1),
+        rfecv.cv_results_["mean_test_score"],
+        yerr=rfecv.cv_results_["std_test_score"],
+    )
+    #plt.title(str(nsamples) + " samples and " + str(nfeatures) + " features of which " + str(ninformative) + " informative, with " + str(nclasses) + " classes")
+    plt.savefig("svc_permute_fs_" + str($x) + ".png", format="png")
+    plt.close("all")
+    
+    print("test")
     """
 }
