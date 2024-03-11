@@ -98,7 +98,7 @@ process SVC_FULLSYNTH{
         yerr=rfecv.cv_results_["std_test_score"],
     )
     #plt.title(str(nsamples) + " samples and " + str(nfeatures) + " features of which " + str(ninformative) + " informative, with " + str(nclasses) + " classes")
-    plt.savefig("svc_fullsynth_fs_depth" + str($depth) + "_" + str($x) +".png", format="png")
+    plt.savefig("svc_fullsynth_fs_depth" + str($depth) + "_samplenum_" + str($refnum) + "_" + str($x) +".png", format="png")
     plt.close("all")
     
     print("test")
