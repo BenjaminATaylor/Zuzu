@@ -5,6 +5,7 @@ nextflow run main.nf \
     --outdir "output" \
     --nperms 3 \
     --truecutoff 0.00001 \
+    --synthstep false \
     -w work \
     -resume
 

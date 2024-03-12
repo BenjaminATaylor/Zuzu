@@ -34,7 +34,7 @@ process SVC_PERMUTE{
 
     # Keep dataset small while testing
     if(DEBUG):
-      count_data=count_data.head(n=2000)
+      count_data=count_data.head(n=500)
 
     # Transpose (sklearn expects to find samples as rows and features as columns)
     count_data = count_data.transpose()
@@ -53,7 +53,7 @@ process SVC_PERMUTE{
     # Setup classification and RFE parameters
     clf = SVC(kernel='linear')
     cv = StratifiedKFold(5)
-    step = 100
+    step = 10
     rfecv = RFECV(
         estimator=clf,
         step=step,

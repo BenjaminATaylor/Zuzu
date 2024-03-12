@@ -38,6 +38,9 @@ if (params.reflevel) { ch_reflevel = params.reflevel } else { exit 1, 'Reference
 // Set number of permutations for fakey datasets
 params.nperms = 7
 
+// By default, run the synthetic data step
+params.synthstep = true
+
 println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
@@ -216,19 +219,22 @@ workflow {
     EDGER_QUASI.out.collect(),
     WILCOXON_QUASI.out.collect()
   )
+  
+  // Allow skipping of this step
+  if ( params.synthstep) {
+    // Synthetic analysis, allowing us to define known true DEGs
+    DATA_FULLSYNTH(perms.combine(breaks).combine(depths))
 
-  // Synthetic analysis, allowing us to define known true DEGs
-  DATA_FULLSYNTH(perms.combine(breaks).combine(depths))
+    DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
+    EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
+    WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
+    SVC_FULLSYNTH(DATA_FULLSYNTH.out)
+    SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
 
-  DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
-  EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
-  WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
-  SVC_FULLSYNTH(DATA_FULLSYNTH.out)
-  SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
-
-  FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out.collect(),
-                  EDGER_FULLSYNTH.out.collect(),
-                  WILCOXON_FULLSYNTH.out.collect(),
-                  SVC_FULLSYNTH_POSTPROCESS.out.collect())
-
+    FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out.collect(),
+                    EDGER_FULLSYNTH.out.collect(),
+                    WILCOXON_FULLSYNTH.out.collect(),
+                    SVC_FULLSYNTH_POSTPROCESS.out.collect())
+  }
+  
 }

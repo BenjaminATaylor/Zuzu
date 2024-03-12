@@ -54,7 +54,7 @@ process SVC_BASIC{
   # Setup classification and RFE parameters
   clf = SVC(kernel='linear')
   cv = StratifiedKFold(5)
-  step = 100
+  step = 10
   rfecv = RFECV(
       estimator=clf,
       step=step,
