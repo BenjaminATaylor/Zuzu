@@ -30,11 +30,13 @@ process SVC_PERMUTE{
     count_data=pd.read_table('$countsframe',sep=',',index_col=0) 
     samplesheet=pd.read_csv('$samplesheet')
 
-    DEBUG=True
-
     # Keep dataset small while testing
-    if(DEBUG):
-      count_data=count_data.head(n=500)
+    pare = True if ('$params.pareml' == "true") else False
+    print("Paring: " + str(pare))
+    if(pare):
+        count_data=count_data.head(n=100)
+        
+    count_data=count_data.head(n=100)
 
     # Transpose (sklearn expects to find samples as rows and features as columns)
     count_data = count_data.transpose()
@@ -53,7 +55,10 @@ process SVC_PERMUTE{
     # Setup classification and RFE parameters
     clf = SVC(kernel='linear')
     cv = StratifiedKFold(5)
-    step = 10
+    
+    # Use a larger step size if debugging, to speed the pipeline
+    step = 50 if pare else 1
+    
     rfecv = RFECV(
         estimator=clf,
         step=step,

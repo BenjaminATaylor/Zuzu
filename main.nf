@@ -20,6 +20,7 @@ include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 include { WILCOXON_QUASI } from './modules/wilcoxon_quasi.nf'
 include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
+include { QUASI_PLOTS } from './modules/quasi_plots.nf'
 include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
 include { DESEQ_FULLSYNTH } from './modules/deseq_fullsynth.nf'
 include { EDGER_FULLSYNTH } from './modules/edger_fullsynth.nf'
@@ -41,6 +42,9 @@ params.nperms = 7
 // By default, run the synthetic data step
 params.synthstep = true
 
+// If this is a debug run, pare down the data passed to the ML methods because these take a long time to run
+params.pareml = false
+
 println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
 println("Reference level: " + ch_reflevel)
@@ -50,78 +54,6 @@ println("Reference level: " + ch_reflevel)
 
 // Set a vector of depths across which to generate fullsynth datasets
 depths = Channel.from(1e5, 1e6, 1e7)
-
-process QUASI_PLOTS {
-
-  publishDir "$params.outdir"
-
-  input:
-  val deseq_quasis
-  val edger_quasis
-  val wilcox_quasis
-
-  output:
-  path "quasi_plot.pdf"
-
-  """
-  #!/usr/bin/env Rscript
-  library("tidyverse", quietly = TRUE)
-  library("reshape2", quietly = TRUE)
-
-  deseq.inlist = str_remove_all("$deseq_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-
-  deseq.quasi.input = 
-    sapply(deseq.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "DESeq2") %>% 
-    melt(id.vars = c("method","samplenum"))
-
-  edger.inlist = str_remove_all("$edger_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-
-  edger.quasi.input = 
-    sapply(edger.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "edgeR") %>% 
-    melt(id.vars = c("method","samplenum"))
-
-  wilcox.inlist = str_remove_all("$wilcox_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-
-  wilcox.quasi.input = 
-    sapply(wilcox.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "wilcox") %>% 
-    melt(id.vars = c("method","samplenum"))
-
-  gg.quasi.input = rbind(deseq.quasi.input, 
-                          edger.quasi.input,
-                          wilcox.quasi.input)
-
-  gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
-    geom_point(size = 3, alpha = 0.7) +
-    scale_y_continuous(limits = c(0,1)) +
-    labs(x = "Method",y = "Replicates per group") +
-    facet_grid(samplenum~variable) +
-    theme_bw() +
-    theme(strip.background = element_blank())
-
-  ggsave(gg.quasi, 
-     filename = "quasi_plot.pdf",
-     device = "pdf", bg = "transparent",
-     width =  30, height = 20, units = "cm")
-  """
-}
 
 process CREATE_BREAKS {
 
