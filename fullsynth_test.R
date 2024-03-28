@@ -18,7 +18,7 @@ bignum; smallnum
 
 # generate synthetic data
 # TODO: adjust parameters based on the real input data 
-synthdata = generateSyntheticData(dataset = "qkwnqiuh", n.vars = 1000, 
+synthdata = generateSyntheticData(dataset = "qkwnqiuh", n.vars = 5000, 
                                   samples.per.cond = bignum, n.diffexp = 200, 
                                   repl.id = 1, seqdepth = depth, 
                                   fraction.upregulated = 0.5,

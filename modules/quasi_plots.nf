@@ -6,6 +6,7 @@ process QUASI_PLOTS{
   val deseq_quasis
   val edger_quasis
   val wilcox_quasis
+  val svm_quasis
 
   output:
   path "quasi_plot.pdf"
@@ -50,10 +51,23 @@ process QUASI_PLOTS{
     mutate_all(as.numeric) %>%
     mutate(method = "wilcox") %>% 
     melt(id.vars = c("method","samplenum"))
+    
+  svm.inlist = str_remove_all("$svm_quasis","[\\\\[\\\\] ]") %>% 
+    strsplit(split = ",") %>% unlist()
+
+  svm.quasi.input = 
+    sapply(svm.inlist, read.csv) %>% 
+    t() %>% 
+    `row.names<-`(NULL) %>% 
+    data.frame() %>%
+    mutate_all(as.numeric) %>%
+    mutate(method = "svm") %>% 
+    melt(id.vars = c("method","samplenum"))
 
   gg.quasi.input = rbind(deseq.quasi.input, 
                           edger.quasi.input,
-                          wilcox.quasi.input)
+                          wilcox.quasi.input,
+                          svm.quasi.input)
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
@@ -66,6 +80,6 @@ process QUASI_PLOTS{
   ggsave(gg.quasi, 
      filename = "quasi_plot.pdf",
      device = "pdf", bg = "transparent",
-     width =  30, height = 20, units = "cm")
+     width =  35, height = 20, units = "cm")
   """
 }

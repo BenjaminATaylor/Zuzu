@@ -3,10 +3,10 @@ nextflow run main.nf \
     --countsframe "input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv" \
     --reflevel "Pre-treatment" \
     --outdir "output" \
-    --nperms 100 \
+    --nperms 5 \
     --truecutoff 0.00001 \
     --synthstep false \
-    --pareml true \
+    --pareml false \
     -w work \
     -resume
 

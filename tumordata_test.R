@@ -16,7 +16,8 @@ groupsize = 30
 picksamples = c(subset(tdata, phenotype == "Tumor")$sample[1:groupsize],
                 subset(tdata, phenotype == "Normal")$sample[1:groupsize])
 
-genesize = nrow(tcounts)
+#genesize = nrow(tcounts) # for all genes
+genesize = 500
 pickgenes = rownames(tcounts)[1:genesize]
 testcounts = tcounts[pickgenes,picksamples]
 tesdata = tdata[match(picksamples,tdata$sample),]

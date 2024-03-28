@@ -198,6 +198,12 @@ plot(hockeyData_plot$num,hockeyData_plot$error,colour = hockeyData_plot$feature,
 
 
 
+
+
+outframe.columns = ['gene', 'DEGstatus']
+outframe.to_csv("./svc_table.csv",sep =',',index=False)
+
+
 # get minimum of this curve to find the point at which the error window is at its minimum
 optimal_removal = which(moving_avg == min(moving_avg));
 # list the features to be removed from the original set of genes
@@ -215,4 +221,5 @@ svm.optimal = svm.train(counts_clean_subsample,
 
 print(paste0("Number of genes included in optimised model: ", nrow(counts_clean_subsample)))
 print(paste0("Root mean cross-validation error rate for optimised model: ", svm.optimal$validation_error))
+
 
