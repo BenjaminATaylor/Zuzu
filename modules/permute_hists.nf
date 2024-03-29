@@ -51,22 +51,33 @@ process PERMUTE_HISTS{
     list_cbind() %>%
     rowSums()
 
-  SVC.inlist = str_remove_all("$SVC_infiles","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-  SVC.permdegs = lapply(SVC.inlist,pythout_readfun) %>% 
-    list_cbind() %>%
-    rowSums()
-
-
-  permhist.in = cbind(deseq.permdegs,
-                      edger.permdegs,
-                      wilcox.permdegs,
-                      SVC.permdegs) %>%
-    `colnames<-`(c("DESeq2",
+  # Only include ML outputs if specified by user
+  if("$params.mlstep" == "true"){
+    SVC.inlist = str_remove_all("$SVC_infiles","[\\\\[\\\\] ]") %>% 
+      strsplit(split = ",") %>% unlist()
+    SVC.permdegs = lapply(SVC.inlist,pythout_readfun) %>% 
+      list_cbind() %>%
+      rowSums()
+    
+    permhist.in = cbind(deseq.permdegs,
+                        edger.permdegs,
+                        wilcox.permdegs,
+                        SVC.permdegs) %>%
+      `colnames<-`(c("DESeq2",
                     "edgeR",
                     "Wilcoxon",
                     "SVC")) %>%
-    melt()
+      melt()
+  } else {
+    permhist.in = cbind(deseq.permdegs,
+                        edger.permdegs,
+                        wilcox.permdegs) %>%
+      `colnames<-`(c("DESeq2",
+                    "edgeR",
+                    "Wilcoxon")) %>%
+      melt()
+}
+
 
   # Generate breaks contingent on number of reps
   cutbreaks = cut(seq(1,nperms+1),breaks = 5, right = TRUE) %>% levels() %>%
@@ -80,7 +91,7 @@ process PERMUTE_HISTS{
   #plot
   gg.permhist = ggplot(permhist.in, aes(x = value)) +
     geom_histogram(color = "black", fill = "white", bins = 100) +
-    scale_x_continuous(limits = c(1,(nperms+1)), breaks = cutbreaks) +
+    scale_x_continuous(limits = c(-1,(nperms+1)), breaks = cutbreaks) +
     labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
          y = "Number of genes") +
     theme_bw() +

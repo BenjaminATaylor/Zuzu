@@ -3,6 +3,7 @@
 // Modules to include
 include { CLEANINPUTS } from './modules/cleaninputs.nf'
 include { QUALITYCONTROL } from './modules/qualitycontrol.nf'
+include { CREATE_BREAKS } from './modules/create_breaks.nf'
 include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { EDGER_BASIC } from './modules/edger_basic.nf'
 include { WILCOXON_BASIC } from './modules/wilcoxon_basic.nf'
@@ -48,6 +49,7 @@ params.synthstep = true
 
 // If this is a debug run, pare down the data passed to the ML methods because these take a long time to run
 params.pareml = false
+params.mlstep = true
 
 println("Sample sheet: " + ch_samplesheet)
 println("Counts matrix: " + ch_countsframe)
@@ -58,46 +60,7 @@ println("Reference level: " + ch_reflevel)
 
 // Set a vector of depths across which to generate fullsynth datasets
 depths = Channel.from(1e5, 1e6, 1e7)
-
-process CREATE_BREAKS {
-
-  debug true
-
-  input:
-  path samplesheet
-
-  output:
-  file 'breaks.csv'
-  //env refouts, emit: refouts
-  //env altouts, emit: altouts
-
-  """
-  #!/usr/bin/env Rscript
-  library("tidyverse", quietly = TRUE)
-  samplesheet = read.csv("$samplesheet")
-  reflevel = "$params.reflevel"
-
-  reftot = nrow(subset(samplesheet, phenotype == reflevel))
-  alttot = nrow(subset(samplesheet, phenotype != reflevel))
-
-  refbreaks = cut(seq(1,reftot),breaks = 3, right = TRUE) %>% levels() %>%
-    str_match("\\\\,[^]]*") %>%
-    str_remove(",") %>%
-    as.numeric() %>%
-    round()
-
-  altbreaks = cut(seq(1,alttot),breaks = 3, right = TRUE) %>% levels() %>%
-    str_match("\\\\,[^]]*") %>%
-    str_remove(",") %>%
-    as.numeric() %>%
-    round()
-
-  outbreaks = data.frame(refbreaks, altbreaks)
-  write.table(outbreaks, "breaks.csv", sep = ",", row.names = F, col.names = F)
-  """
-}
-
-
+dummypath = Channel.fromPath( "0" )
 
 workflow {
   //Initial data QC and cleanup
@@ -111,9 +74,11 @@ workflow {
   DESEQ_BASIC(CLEANINPUTS.out)
   EDGER_BASIC(CLEANINPUTS.out)
   WILCOXON_BASIC(CLEANINPUTS.out)
-  SVC_BASIC(CLEANINPUTS.out)
-  SVM_BASIC(CLEANINPUTS.out) //testing
-
+  if ( params.mlstep ) {
+    SVC_BASIC(CLEANINPUTS.out)
+    SVM_BASIC(CLEANINPUTS.out) //testing
+  }
+  
   ////Permutation analysis with no true signal
   perms = Channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
@@ -123,10 +88,12 @@ workflow {
   EDGER_PERMUTE(DATA_PERMUTE.out.frames)
   // For Wilcoxon
   WILCOXON_PERMUTE(DATA_PERMUTE.out.frames)
-  // For SVC
-  SVC_PERMUTE(DATA_PERMUTE.out)
-  // For R SVM
-  SVM_PERMUTE(DATA_PERMUTE.out)
+  if ( params.mlstep ) {
+    // For SVC
+    SVC_PERMUTE(DATA_PERMUTE.out)
+    // For R SVM
+    SVM_PERMUTE(DATA_PERMUTE.out)
+  }
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out.table,
@@ -135,14 +102,14 @@ workflow {
     EDGER_PERMUTE.out.nDEGs.collect(),
     WILCOXON_BASIC.out,
     WILCOXON_PERMUTE.out.nDEGs.collect(),
-    SVM_BASIC.out.table,
-    SVM_PERMUTE.out.nDEGs.collect(),
+    params.mlstep ? SVM_BASIC.out.table : dummypath,
+    params.mlstep ? SVM_PERMUTE.out.nDEGs.collect() : dummypath
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_PERMUTE.out.outfile.collect(),
-    SVM_PERMUTE.out.outfile.collect()
+    params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath
   )
 
   // Quasi-permutation analysis with partial true signal retained
@@ -152,14 +119,16 @@ workflow {
   EDGER_QUASI(EDGER_DATA_QUASI.out)
   WILCOXON_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
-  SVM_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
-  SVM_QUASI(SVM_DATA_QUASI.out)
+  if ( params.mlstep ) {
+    SVM_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+    SVM_QUASI(SVM_DATA_QUASI.out)
+  }
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),
     EDGER_QUASI.out.collect(),
     WILCOXON_QUASI.out.collect(),
-    SVM_QUASI.out.collect(),
+    params.mlstep ? SVM_QUASI.out.collect() : dummypath
   )
   
   // Allow skipping of this step
@@ -170,13 +139,16 @@ workflow {
     DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
     EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
     WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
-    SVC_FULLSYNTH(DATA_FULLSYNTH.out)
-    SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
+    if(params.mlstep){
+      SVM_QUASI.out.collect() 
+      SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
+    }
 
     FULLSYNTH_PLOTS(DESEQ_FULLSYNTH.out.collect(),
                     EDGER_FULLSYNTH.out.collect(),
                     WILCOXON_FULLSYNTH.out.collect(),
-                    SVC_FULLSYNTH_POSTPROCESS.out.collect())
+                    params.mlstep ? SVC_FULLSYNTH_POSTPROCESS.out.collect() : dummypath
+    )
   }
   
 }

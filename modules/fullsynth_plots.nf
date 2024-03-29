@@ -39,17 +39,30 @@ process FULLSYNTH_PLOTS {
     deseq.synth.input = read_fullsynths("$deseq_synths", "DESeq2")
     edger.synth.input = read_fullsynths("$edger_synths", "edgeR")
     wilcox.synth.input = read_fullsynths("$wilcox_synths", "Wilcoxon")
-    svc.synth.input = read_fullsynths("$svc_synths", "SVC")
+    # Only include ML outputs if specified by user
+    if("$params.mlstep" == "true"){
+        svc.synth.input = read_fullsynths("$svc_synths", "SVC")
 
-    gg.synth.input = rbind(deseq.synth.input, 
+        gg.synth.input = rbind(deseq.synth.input, 
+                            edger.synth.input,
+                            wilcox.synth.input,
+                            svc.synth.input) %>% 
+            mutate(samplenum = as.factor(samplenum)) %>%
+            mutate(depth = as.factor(depth)) %>%
+            group_by(method,samplenum,depth,variable) %>% 
+            summarize(mean=mean(value)) %>%
+            mutate(mean = signif(mean,3))
+    } else {
+        gg.synth.input = rbind(deseq.synth.input, 
                         edger.synth.input,
-                        wilcox.synth.input,
-                        svc.synth.input) %>% 
+                        wilcox.synth.input) %>% 
         mutate(samplenum = as.factor(samplenum)) %>%
         mutate(depth = as.factor(depth)) %>%
         group_by(method,samplenum,depth,variable) %>% 
         summarize(mean=mean(value)) %>%
         mutate(mean = signif(mean,3))
+        
+    }
 
 
     # Take FDP as inverse (1-FDP), so that higher values are better (matching to power and normAUC)

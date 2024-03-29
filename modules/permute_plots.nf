@@ -62,24 +62,33 @@ process PERMUTE_PLOTS{
                                     nDEGs = wilcox.ndegs, 
                                     permutes = wilcox.perms)
   
-  ## SVC inputs
-  # DEGs from full model
-  SVC.table = read.csv("$SVC_table", row.names = 1)
-  SVC.ndegs = nrow(subset(SVC.table, DEGstatus==1))
-  # Permutations
-  SVC.inlist = str_remove_all("$SVC_perms","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-  SVC.perms = sapply(SVC.inlist, function(x) as.integer(read.delim(x, header = FALSE))) %>% unname()
-  # Collated input
-  SVC.permute.input =  data.frame(method = "SVC", 
-                                  nDEGs = SVC.ndegs, 
-                                  permutes = SVC.perms)
+  # Only include ML outputs if specified by user
+  if("$params.mlstep" == "true"){
+    ## SVC inputs
+    # DEGs from full model
+    SVC.table = read.csv("$SVC_table", row.names = 1)
+    SVC.ndegs = nrow(subset(SVC.table, DEGstatus==1))
+    # Permutations
+    SVC.inlist = str_remove_all("$SVC_perms","[\\\\[\\\\] ]") %>% 
+      strsplit(split = ",") %>% unlist()
+    SVC.perms = sapply(SVC.inlist, function(x) as.integer(read.delim(x, header = FALSE))) %>% unname()
+    # Collated input
+    SVC.permute.input =  data.frame(method = "SVC", 
+                                    nDEGs = SVC.ndegs, 
+                                    permutes = SVC.perms)
 
-  # Combined inputs for plotting
-  permuteplot.input = rbind(deseq.permute.input,
-                            edger.permute.input,
-                            wilcox.permute.input,
-                            SVC.permute.input)
+    # Combined inputs for plotting
+    permuteplot.input = rbind(deseq.permute.input,
+                              edger.permute.input,
+                              wilcox.permute.input,
+                              SVC.permute.input)
+  } else {
+    # Combined inputs for plotting
+    permuteplot.input = rbind(deseq.permute.input,
+                              edger.permute.input,
+                              wilcox.permute.input)
+    
+  }
 
   print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
           geom_point(size = 3, alpha = 0.7) +
