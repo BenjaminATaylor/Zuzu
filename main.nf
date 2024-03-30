@@ -134,7 +134,7 @@ workflow {
   // Allow skipping of this step
   if ( params.synthstep) {
     // Synthetic analysis, allowing us to define known true DEGs
-    DATA_FULLSYNTH(perms.combine(breaks).combine(depths))
+    DATA_FULLSYNTH(perms.combine(breaks).combine(depths), ch_countsframe)
 
     DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
     EDGER_FULLSYNTH(DATA_FULLSYNTH.out)

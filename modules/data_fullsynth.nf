@@ -2,6 +2,7 @@ process DATA_FULLSYNTH{
 
     input: 
     tuple val(x), val(refnum), val(altnum), val(depth)
+    path countsframe
 
     output:
     tuple val(depth),
@@ -21,17 +22,27 @@ process DATA_FULLSYNTH{
     refnum = $refnum
     depth = $depth
 
-    # if we wanted to, we could include uneven sample sizes- this to be added in future if desired
+    # (if we wanted to, we could include uneven sample sizes- this to be added in future if desired)
     # check which of the two sample sizes is larger
     # we'll subset the columns for the other, since compcodeR cannot directly simulate uneven sample sizes
     #bignum = ifelse(altnum>refnum, altnum, refnum)
     #smallnum = ifelse(altnum>refnum, refnum, altnum)
 
+    # pull in original input data. We'll use this to create a synthetic dataset that's similar to the true dataset
+    orig.countsframe = read.delim("$countsframe", row.names = 1, check.names = FALSE) %>% 
+    select_if(is.numeric)
+    
+    # get number of genes, number of desired DEGs, and a vector of gene expression from real data
+    ngenes = nrow(orig.countsframe)
+    nsynthdegs = ceiling(ngenes*$params.synthdeg_pct)
+    origmeans = rowMeans(orig.countsframe)
+    
     # generate synthetic data
     # TODO: adjust parameters based on the real input data 
-    synthdata = generateSyntheticData(dataset = "testset_1", n.vars = 2000, 
-                                    samples.per.cond = refnum, n.diffexp = 200, 
+    synthdata = generateSyntheticData(dataset = "testset_1", n.vars = ngenes, 
+                                    samples.per.cond = refnum, n.diffexp = nsynthdegs, 
                                     repl.id = 1, seqdepth = depth, 
+                                    relmeans = origmeans,
                                     fraction.upregulated = 0.5, 
                                     between.group.diffdisp = FALSE, 
                                     filter.threshold.total = 10, 
