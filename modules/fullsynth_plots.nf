@@ -67,12 +67,13 @@ process FULLSYNTH_PLOTS {
 
     # Take FDP as inverse (1-FDP), so that higher values are better (matching to power and normAUC)
     gg.synth.input\$mean[which(gg.synth.input\$variable == "FDP")] = 1-(gg.synth.input\$mean[which(gg.synth.input\$variable == "FDP")])
+    gg.synth.input\$variable = fct_recode(gg.synth.input\$variable, "1-FDP"="FDP")
     
     # Plot as heatmap    
     gg.synth = ggplot(gg.synth.input, aes(x = depth, y = samplenum)) +
         geom_tile(aes(fill = mean),color = "gray20", size=.75, width=1, height = 1)+
-        geom_text(aes(label= mean),
-                    lineheight = 0.75, size = 3.5) +
+        geom_label(aes(label= mean), color = "white",
+                    lineheight = 0.75, size = 3.5, alpha = 0.7, fill = "gray10") +
         scale_x_discrete("Sequencing depth",
                         expand = c(0,0)) +
         scale_y_discrete("Replicates per treatment",
