@@ -17,6 +17,7 @@ include { SVC_PERMUTE } from './modules/svc_permute.nf'
 include { SVM_PERMUTE } from './modules/svm_permute.nf'
 include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
+include { INTER_OBSERVER_BASIC } from './modules/inter_observer_basic.nf'
 include { DESEQ_QUASI } from './modules/deseq_quasi.nf'
 include { DESEQ_DATA_QUASI } from './modules/deseq_data_quasi.nf'
 include { EDGER_QUASI } from './modules/edger_quasi.nf'
@@ -110,6 +111,12 @@ workflow {
     EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_PERMUTE.out.outfile.collect(),
     params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath
+  )
+  INTER_OBSERVER_BASIC(
+    DESEQ_BASIC.out.table,
+    EDGER_BASIC.out,
+    WILCOXON_BASIC.out,
+    params.mlstep ? SVM_BASIC.out.table : dummypath
   )
 
   // Quasi-permutation analysis with partial true signal retained
