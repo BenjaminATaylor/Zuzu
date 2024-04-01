@@ -106,18 +106,21 @@ workflow {
     params.mlstep ? SVM_BASIC.out.table : dummypath,
     params.mlstep ? SVM_PERMUTE.out.nDEGs.collect() : dummypath
   )
-  PERMUTE_HISTS(
-    DESEQ_PERMUTE.out.outfile.collect(),
-    EDGER_PERMUTE.out.outfile.collect(),
-    WILCOXON_PERMUTE.out.outfile.collect(),
-    params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath
-  )
   INTER_OBSERVER_BASIC(
     DESEQ_BASIC.out.table,
+    DESEQ_BASIC.out.dds,
     EDGER_BASIC.out,
     WILCOXON_BASIC.out,
     params.mlstep ? SVM_BASIC.out.table : dummypath
   )
+  PERMUTE_HISTS(
+    DESEQ_PERMUTE.out.outfile.collect(),
+    EDGER_PERMUTE.out.outfile.collect(),
+    WILCOXON_PERMUTE.out.outfile.collect(),
+    params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath,
+    INTER_OBSERVER_BASIC.out.deseq_poorfits
+  )
+
 
   // Quasi-permutation analysis with partial true signal retained
   DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))

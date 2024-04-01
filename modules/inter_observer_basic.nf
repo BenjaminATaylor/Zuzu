@@ -6,17 +6,25 @@ process INTER_OBSERVER_BASIC{
 
   input:
   path deseq_table
+  path deseq_dds
   path edger_table
   path wilcox_table
   path SVC_table
 
   output:
   path "upSet_basic.pdf"
+  path "basic_overlap_violins.pdf"
+  path "deseq_poorfits.RData", emit: deseq_poorfits
 
     """
     #!/usr/bin/env Rscript
     library("tidyverse", quietly = TRUE)
     library("UpSetR", quietly = TRUE)
+    library("DESeq2")
+    library("vcd")
+    library("ggpubr")
+
+    deseq.full = get(load("$deseq_dds"))
 
     #hypergeometric overlap test function
     gene_overlap_test = function(list1, list2, background,verbose=TRUE,lower.tail=FALSE){
@@ -105,8 +113,52 @@ process INTER_OBSERVER_BASIC{
 
     pdf(file="upSet_basic.pdf",width = 24, height = 18) ; upset.combined ;dev.off()    
         
-        
+    # From Li et al.: we can estimate each gene's poorness-of-fit to the nbinom distribution under each model
+    # Doing so let's us asked whether mismatched genes are disproportionately likely to fail this assumption
+    # NB to fit li et al we should use the package-normalized methods for each, but for testing we start with just the DESeq2 fits
+    deseq.dispersions = dispersions(deseq.full)
+    deseq.normcounts = as.list(data.frame(t(counts(deseq.full, normalized=TRUE))))
+
+    getfit = function(counts,disp){
     
+    thesecounts = round(counts)
+    fit = summary(goodfit(thesecounts, type = "nbinomial", 
+                    par = list(size = 1/disp)))
+    return(-log10(fit[3]))
+    
+    }
+
+    deseq.poorfits = mapply(getfit, deseq.normcounts, deseq.dispersions)
+    save(deseq.poorfits,file = "deseq_poorfits.RData") # Save for downstream
+
+    # Okay, now what we want to do is divide genes into sets based on how many methods selected them as DEGs
+    # I.e., just one method, two methods, all three
+    # Get IDs used by UpSet
+    thesegenes = unlist(listInput.combined, use.names = FALSE)
+    thesegenes = thesegenes[!duplicated(thesegenes)]
+    # Get rowsums of UpSet intersections
+    intersects = data.frame(gene = thesegenes, sum = rowSums(upset.combined\$New_data))
+    ggframe = left_join(intersects, rownames_to_column(data.frame(deseq.poorfits),var = "gene")) %>%
+    `colnames<-`(c("gene","sum","poorfit"))
+
+    gg.poor = ggplot(ggframe, aes(x = as.factor(sum), y = poorfit)) +
+    geom_violin() + 
+    labs(x = "Number of methods in which gene was identified as a DEG",
+        y = "Poorness of fit to Negative Binomial distribution") +
+    stat_compare_means(method = "wilcox.test",
+                        label = "p.signif",
+                        size = 5,
+                        comparisons = list(c("1","2"),
+                                            c("2","3"),
+                                            c("1","3"))#,
+                        #label.y = c(0.31, 0.275, 0.255)
+                        ) +
+    theme_bw()
+
+    ggsave(gg.poor, 
+        filename = "basic_overlap_violins.pdf",
+        device = "pdf", bg = "transparent",
+        width =  12, height = 12, units = "cm")
     """
 
 }
