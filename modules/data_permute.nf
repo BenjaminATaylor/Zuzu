@@ -1,5 +1,7 @@
 process DATA_PERMUTE{
 
+  label 'small_job'
+
   input: 
   tuple path(samplesheet), path(countsframe)
   val x

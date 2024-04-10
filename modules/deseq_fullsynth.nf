@@ -1,5 +1,7 @@
 process DESEQ_FULLSYNTH{
 
+    label 'mid_job'
+
     input:
     tuple val(depth), 
           path(truedegs), //"trueDEGs.RData"

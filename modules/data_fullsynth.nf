@@ -1,5 +1,7 @@
 process DATA_FULLSYNTH{
 
+    label 'mid_job'
+
     input: 
     tuple val(x), val(refnum), val(altnum), val(depth)
     path countsframe

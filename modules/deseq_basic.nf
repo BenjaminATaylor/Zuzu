@@ -1,4 +1,6 @@
 process DESEQ_BASIC{
+  
+  label 'mid_job'
 
   input: 
   tuple path(samplesheet), path(countsframe) 

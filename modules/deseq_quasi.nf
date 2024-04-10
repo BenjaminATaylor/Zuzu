@@ -1,5 +1,7 @@
 process DESEQ_QUASI {
   
+  label 'small_job'
+  
   input: 
   tuple path(quasiframe), path(truedegs), path(samplesheet), val(samplenum)
 

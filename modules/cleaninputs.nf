@@ -1,6 +1,7 @@
 process CLEANINPUTS {
 
-    conda 'r-tidyverse-1.3.1'
+    //conda 'r-tidyverse-1.3.1'
+    label 'small_job'
 
     input: 
     path samplesheet

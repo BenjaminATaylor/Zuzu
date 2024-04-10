@@ -1,7 +1,7 @@
 process CREATE_BREAKS {
 
-  debug true
-
+  label 'small_job'
+  
   input:
   path samplesheet
 

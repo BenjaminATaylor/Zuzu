@@ -1,4 +1,6 @@
 process DESEQ_PERMUTE{
+  
+  label 'mid_job'
 
   input: 
   tuple path(samplesheet), path(countsframe) 
