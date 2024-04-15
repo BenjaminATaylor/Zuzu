@@ -159,6 +159,10 @@ process PERMUTE_HISTS{
           device = "pdf", bg = "transparent",
           width =  20, height = 12, units = "cm")
 
+  } else {
+  # If not enough perms, fool nextflow with dummy output 
+    dummy = NA
+    save(dummy , file = "permute_violins.pdf")
   }
 
   """
