@@ -1,12 +1,30 @@
 nextflow run main.nf \
-    --samplesheet "input/test3/samplesheet_phenotype.csv" \
-    --countsframe "input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv" \
-    --reflevel "Pre-treatment" \
+   #--samplesheet "input/test3/samplesheet_phenotype.csv" \
+   #--countsframe "input/test3/GSE91061_BMS038109Sample.hg19KnownGene.raw.tsv" \
+   #--reflevel "Pre-treatment" \
+    --samplesheet "input/test2/samplesheet_phenotype.csv" \
+    --countsframe "input/test2/salmon.merged.gene_counts.tsv" \
+    --reflevel "nurse" \
     --outdir "output" \
-    --nperms 5 \
+    --nperms 20 \
     --truecutoff 0.00001 \
-    --synthstep false \
-    --pareml false \
+    --synthstep true \
+    --synthdeg_pct 0.1 \
+    --mlstep false \
+    --pareml true \
     -w work \
     -resume
-
+    
+nextflow run main.nf \
+    --samplesheet "input/test5/samplesheet.csv" \
+    --countsframe "input/test5/salmon.merged.gene_counts.tsv" \
+    --reflevel "nurse" \
+    --outdir "output" \
+    --nperms 3 \
+    --truecutoff 0.00001 \
+    --synthstep false \
+    --synthdeg_pct 0.1 \
+    --mlstep false \
+    --pareml true \
+    -w work \
+    -resume
