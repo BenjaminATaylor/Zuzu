@@ -11,6 +11,7 @@ process SVC_BASIC{
   output:
   path "svc_table.csv", emit: table
   path "svc_basic_fs.png"
+  path "rfecv.pickle"
 
   script:
   """
@@ -20,6 +21,7 @@ process SVC_BASIC{
   import os
   import csv
   import matplotlib.pyplot as plt
+  import pickle
 
   from sklearn import preprocessing
   from sklearn.feature_selection import RFECV
@@ -72,6 +74,10 @@ process SVC_BASIC{
   # Run FRFECV (this may take a while depending on number of features (higher = longer),
   # cv (higher = longer), step size (higher = shorter))
   rfecv.fit(X, y)
+  # Save for later
+  with open('rfecv.pickle', 'wb') as handle:
+    pickle.dump(rfecv, handle, protocol=pickle.HIGHEST_PROTOCOL)
+  
 
   # Get outputs
   print(f"Optimal number of features: {rfecv.n_features_}")

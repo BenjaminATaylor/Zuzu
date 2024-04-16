@@ -16,7 +16,9 @@ process SVC_FULLSYNTH{
           path(truedegs),
           val(refnum),
           path("svc_table.csv"),
-          path("svc_fullsynth_fs_*.png")
+          path("svc_fullsynth_fs_*.png"),
+          path("rfecv.pickle")
+          
 
     script:
     """
@@ -26,7 +28,7 @@ process SVC_FULLSYNTH{
     import os
     import csv
     import matplotlib.pyplot as plt
-
+    import pickle
 
     from sklearn import preprocessing
     from sklearn.feature_selection import RFECV
@@ -78,6 +80,10 @@ process SVC_FULLSYNTH{
     # Run FRFECV (this may take a while depending on number of features (higher = longer),
     # cv (higher = longer), step size (higher = shorter))
     rfecv.fit(X, y)
+    # Save for later
+    with open('rfecv.pickle', 'wb') as handle:
+        pickle.dump(rfecv, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
 
     # Get outputs
     print(f"Optimal number of features: {rfecv.n_features_}")
