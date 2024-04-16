@@ -1,6 +1,7 @@
 process SVC_FULLSYNTH{
 
     publishDir "$params.outdir/svctables", pattern: '*.png'
+    label 'big_job'
 
     input:
     tuple val(depth), 

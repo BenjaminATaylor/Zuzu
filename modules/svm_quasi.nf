@@ -1,5 +1,7 @@
 process SVM_QUASI {
   
+  label 'big_job'
+  
   input: 
   tuple path(quasiframe), path(truedegs), path(samplesheet), val(samplenum)
 

@@ -1,6 +1,5 @@
 process CLEANINPUTS {
 
-    //conda 'r-tidyverse-1.3.1'
     label 'small_job'
 
     input: 

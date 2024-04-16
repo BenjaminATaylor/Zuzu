@@ -1,6 +1,6 @@
 process SVC_BASIC{
 
-  //debug true
+  label 'big_job'
   
   publishDir "$params.outdir/svctables", pattern: '*.png'
   //publishDir ".", pattern: 'svc_table.csv'

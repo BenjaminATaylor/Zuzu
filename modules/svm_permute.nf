@@ -1,6 +1,7 @@
 process SVM_PERMUTE{
 
   publishDir "$params.outdir/svmtables", pattern: '*.png'
+  label 'big_job'
   
   input: 
   tuple path(samplesheet), path(countsframe) 

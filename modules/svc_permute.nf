@@ -1,6 +1,7 @@
 process SVC_PERMUTE{
 
-     publishDir "$params.outdir/svctables", pattern: '*.png'
+    publishDir "$params.outdir/svctables", pattern: '*.png'
+    label 'big_job'
 
     input: 
     tuple path(samplesheet), path(countsframe) 
