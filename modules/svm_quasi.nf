@@ -80,7 +80,7 @@ process SVM_QUASI {
     iterations = data.frame(feature = character(),
                             error_before_removal = numeric())
     # choose step size for feature eleimination
-    stepsize = 5
+    stepsize = $params.stepsize
     
     #iteratively remove features until target number is reached
     while(nfeatures >= (nfeatures_target+stepsize)){

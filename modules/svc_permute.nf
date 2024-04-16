@@ -37,8 +37,6 @@ process SVC_PERMUTE{
     if(pare):
         count_data=count_data.head(n=100)
         
-    count_data=count_data.head(n=100)
-
     # Transpose (sklearn expects to find samples as rows and features as columns)
     count_data = count_data.transpose()
 
@@ -58,7 +56,7 @@ process SVC_PERMUTE{
     cv = StratifiedKFold(5)
     
     # Use a larger step size if debugging, to speed the pipeline
-    step = 50 if pare else 1
+    step = 50 if pare else $params.stepsize
     
     rfecv = RFECV(
         estimator=clf,

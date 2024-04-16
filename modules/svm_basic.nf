@@ -84,8 +84,8 @@ process SVM_BASIC{
   #instantiate data frame to hold data on the error of each model
   iterations = data.frame(feature = character(),
                           error_before_removal = numeric())
-  # choose step size for feature eleimination
-  stepsize = 5
+  # choose step size for feature elimination
+  stepsize = $params.stepsize
   
   #iteratively remove features until target number is reached
   while(nfeatures >= (nfeatures_target+stepsize)){

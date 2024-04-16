@@ -22,7 +22,7 @@ nextflow run main.nf \
     --outdir "output" \
     --nperms 3 \
     --truecutoff 0.00001 \
-    --synthstep false \
+    --synthstep true \
     --synthdeg_pct 0.1 \
     --mlstep false \
     --pareml true \

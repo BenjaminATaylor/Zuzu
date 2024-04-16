@@ -36,8 +36,6 @@ process SVC_BASIC{
   print("Paring: " + str(pare))
   if(pare):
       count_data=count_data.head(n=100)
-  count_data=count_data.head(n=100)
-
 
   # Transpose (sklearn expects to find samples as rows and features as columns)
   count_data = count_data.transpose()
@@ -58,7 +56,7 @@ process SVC_BASIC{
   cv = StratifiedKFold(5)
   
   # Use a larger step size if debugging, to speed the pipeline
-  step = 50 if pare else 1
+  step = 50 if pare else $params.stepsize
   print("stepsize: " + str(step))
   
   rfecv = RFECV(

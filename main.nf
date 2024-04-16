@@ -8,13 +8,13 @@ include { DESEQ_BASIC } from './modules/deseq_basic.nf'
 include { EDGER_BASIC } from './modules/edger_basic.nf'
 include { WILCOXON_BASIC } from './modules/wilcoxon_basic.nf'
 include { SVC_BASIC } from './modules/svc_basic.nf'
-include { SVM_BASIC } from './modules/svm_basic.nf'
+//include { SVM_BASIC } from './modules/svm_basic.nf'
 include { DATA_PERMUTE } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE } from './modules/deseq_permute.nf'
 include { EDGER_PERMUTE } from './modules/edger_permute.nf'
 include { WILCOXON_PERMUTE } from './modules/wilcoxon_permute.nf'
 include { SVC_PERMUTE } from './modules/svc_permute.nf'
-include { SVM_PERMUTE } from './modules/svm_permute.nf'
+//include { SVM_PERMUTE } from './modules/svm_permute.nf'
 include { PERMUTE_PLOTS } from './modules/permute_plots.nf'
 include { PERMUTE_HISTS } from './modules/permute_hists.nf'
 include { INTER_OBSERVER_BASIC } from './modules/inter_observer_basic.nf'
@@ -24,8 +24,8 @@ include { EDGER_QUASI } from './modules/edger_quasi.nf'
 include { EDGER_DATA_QUASI } from './modules/edger_data_quasi.nf'
 include { WILCOXON_QUASI } from './modules/wilcoxon_quasi.nf'
 include { WILCOXON_DATA_QUASI } from './modules/wilcoxon_data_quasi.nf'
-include { SVM_DATA_QUASI } from './modules/svm_data_quasi.nf'
-include { SVM_QUASI } from './modules/svm_quasi.nf'
+//include { SVM_DATA_QUASI } from './modules/svm_data_quasi.nf'
+//include { SVM_QUASI } from './modules/svm_quasi.nf'
 include { QUASI_PLOTS } from './modules/quasi_plots.nf'
 include { DATA_FULLSYNTH } from './modules/data_fullsynth.nf'
 include { DESEQ_FULLSYNTH } from './modules/deseq_fullsynth.nf'
@@ -77,7 +77,7 @@ workflow {
   WILCOXON_BASIC(CLEANINPUTS.out)
   if ( params.mlstep ) {
     SVC_BASIC(CLEANINPUTS.out)
-    SVM_BASIC(CLEANINPUTS.out) //testing
+    //SVM_BASIC(CLEANINPUTS.out) //testing
   }
   
   ////Permutation analysis with no true signal
@@ -93,7 +93,7 @@ workflow {
     // For SVC
     SVC_PERMUTE(DATA_PERMUTE.out)
     // For R SVM
-    SVM_PERMUTE(DATA_PERMUTE.out)
+    //SVM_PERMUTE(DATA_PERMUTE.out)
   }
   // Combine outputs and plot
   PERMUTE_PLOTS(
@@ -103,21 +103,21 @@ workflow {
     EDGER_PERMUTE.out.nDEGs.collect(),
     WILCOXON_BASIC.out,
     WILCOXON_PERMUTE.out.nDEGs.collect(),
-    params.mlstep ? SVM_BASIC.out.table : dummypath,
-    params.mlstep ? SVM_PERMUTE.out.nDEGs.collect() : dummypath
+    //params.mlstep ? SVM_BASIC.out.table : dummypath,
+    //params.mlstep ? SVM_PERMUTE.out.nDEGs.collect() : dummypath
   )
   INTER_OBSERVER_BASIC(
     DESEQ_BASIC.out.table,
     DESEQ_BASIC.out.dds,
     EDGER_BASIC.out,
     WILCOXON_BASIC.out,
-    params.mlstep ? SVM_BASIC.out.table : dummypath
+    //params.mlstep ? SVM_BASIC.out.table : dummypath
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_PERMUTE.out.outfile.collect(),
-    params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath,
+    //params.mlstep ? SVM_PERMUTE.out.outfile.collect() : dummypath,
     INTER_OBSERVER_BASIC.out.deseq_poorfits
   )
 
@@ -131,14 +131,14 @@ workflow {
   WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
   if ( params.mlstep ) {
     SVM_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
-    SVM_QUASI(SVM_DATA_QUASI.out)
+    //SVM_QUASI(SVM_DATA_QUASI.out)
   }
   // Combine outputs and plot
   QUASI_PLOTS(
     DESEQ_QUASI.out.collect(),
     EDGER_QUASI.out.collect(),
     WILCOXON_QUASI.out.collect(),
-    params.mlstep ? SVM_QUASI.out.collect() : dummypath
+    //params.mlstep ? SVM_QUASI.out.collect() : dummypath
   )
   
   // Allow skipping of this step
