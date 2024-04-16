@@ -103,25 +103,22 @@ workflow {
     EDGER_PERMUTE.out.nDEGs.collect(),
     WILCOXON_BASIC.out,
     WILCOXON_PERMUTE.out.nDEGs.collect(),
-    //params.mlstep ? SVM_BASIC.out.table : 
-    dummypath,
-    //params.mlstep ? SVM_PERMUTE.out.nDEGs.collect() : 
-    dummypath
+    params.mlstep ? SVC_BASIC.out.table : dummypath,
+    params.mlstep ? SVC_PERMUTE.out.nDEGs.collect() : dummypath
   )
   INTER_OBSERVER_BASIC(
     DESEQ_BASIC.out.table,
     DESEQ_BASIC.out.dds,
     EDGER_BASIC.out,
     WILCOXON_BASIC.out,
-    //params.mlstep ? SVM_BASIC.out.table : 
+    params.mlstep ? SVC_BASIC.out.table : 
     dummypath
   )
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_PERMUTE.out.outfile.collect(),
-    //params.mlstep ? SVM_PERMUTE.out.outfile.collect() : 
-    dummypath,
+    params.mlstep ? SVC_PERMUTE.out.outfile.collect() : dummypath,
     INTER_OBSERVER_BASIC.out.deseq_poorfits
   )
 
@@ -142,7 +139,7 @@ workflow {
     DESEQ_QUASI.out.collect(),
     EDGER_QUASI.out.collect(),
     WILCOXON_QUASI.out.collect(),
-    //params.mlstep ? SVM_QUASI.out.collect() : 
+    //params.mlstep ? SVC_QUASI.out.collect() : 
     dummypath
   )
   
@@ -155,7 +152,7 @@ workflow {
     EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
     WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
     if(params.mlstep){
-      SVM_QUASI.out.collect() 
+      SVC_QUASI.out.collect() 
       SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
     }
 
