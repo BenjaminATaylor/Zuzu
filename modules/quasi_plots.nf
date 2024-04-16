@@ -52,29 +52,29 @@ process QUASI_PLOTS{
     mutate(method = "wilcox") %>% 
     melt(id.vars = c("method","samplenum"))
         
-  # Only include ML outputs if specified by user
-  if("$params.mlstep" == "true"){
-    svm.inlist = str_remove_all("$svm_quasis","[\\\\[\\\\] ]") %>% 
-      strsplit(split = ",") %>% unlist()
-
-    svm.quasi.input = 
-      sapply(svm.inlist, read.csv) %>% 
-      t() %>% 
-      `row.names<-`(NULL) %>% 
-      data.frame() %>%
-      mutate_all(as.numeric) %>%
-      mutate(method = "svm") %>% 
-      melt(id.vars = c("method","samplenum"))
-
-    gg.quasi.input = rbind(deseq.quasi.input, 
-                            edger.quasi.input,
-                            wilcox.quasi.input,
-                            svm.quasi.input)
-  } else {
+#  # Only include ML outputs if specified by user
+#  if("$params.mlstep" == "true"){
+#    svm.inlist = str_remove_all("$svm_quasis","[\\\\[\\\\] ]") %>% 
+#      strsplit(split = ",") %>% unlist()
+#
+#    svm.quasi.input = 
+#      sapply(svm.inlist, read.csv) %>% 
+#      t() %>% 
+#      `row.names<-`(NULL) %>% 
+#      data.frame() %>%
+#      mutate_all(as.numeric) %>%
+#      mutate(method = "svm") %>% 
+#      melt(id.vars = c("method","samplenum"))
+#
+#    gg.quasi.input = rbind(deseq.quasi.input, 
+#                            edger.quasi.input,
+#                            wilcox.quasi.input,
+#                            svm.quasi.input)
+#  } else {
     gg.quasi.input = rbind(deseq.quasi.input, 
                             edger.quasi.input,
                             wilcox.quasi.input)
-}
+#}
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
