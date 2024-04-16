@@ -134,7 +134,7 @@ workflow {
   WILCOXON_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
   WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
   if ( params.mlstep ) {
-    SVM_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+    //SVM_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
     //SVM_QUASI(SVM_DATA_QUASI.out)
   }
   // Combine outputs and plot
