@@ -152,7 +152,7 @@ workflow {
     EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
     WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
     if(params.mlstep){
-      SVC_QUASI.out.collect() 
+      SVC_FULLSYNTH(DATA_FULLSYNTH.out)
       SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
     }
 
