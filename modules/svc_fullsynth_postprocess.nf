@@ -7,7 +7,7 @@ process SVC_FULLSYNTH_POSTPROCESS{
           path(truedegs), //"trueDEGs.RData"
           val(refnum),
           path(inframe),
-          path(plotframe) // Included as input for ease of naming, but not used here
+          path(plotframe), // Included as input for ease of naming, but not used here
           path(pickle) // Included as input for ease of naming, but not used here
 
     output:
