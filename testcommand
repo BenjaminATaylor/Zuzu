@@ -24,7 +24,8 @@ nextflow run main.nf \
     --truecutoff 0.00001 \
     --synthstep true \
     --synthdeg_pct 0.1 \
-    --mlstep false \
+    --mlstep true \
     --pareml true \
+    --stepsize 10 \
     -w work \
     -resume
