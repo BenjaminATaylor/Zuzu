@@ -117,11 +117,11 @@ ccc.compcoder.raw$rho.c
 # (Note that for these sample sizes, K-S tests are too sensitive to be of much use)
 
 #### Next compare BCV vs dispersion plots ####
-plotDispEsts(dds)
+plotDispEsts(dds.true)
 plotDispEsts(dds.compcoder)
 
 # We can extract the parameters of the two dispersion functions, although I'm not sure that there's a statistical test we can apply here
-dispersionFunction(dds)
+dispersionFunction(dds.true)
 dispersionFunction(dds.compcoder)
 
 
@@ -219,4 +219,18 @@ counts_pca = function(counts, metadata){
 counts_pca(counts.true, metadata.true)
 counts_pca(counts.compcoder, metadata.compcoder)
 
-#### Check library size distributions ####
+#### Check per-gene expression level distributions ####
+ggplot(data.frame(true = rowMeans(log(counts.true+1)), compcoder = rowMeans(log(counts.compcoder+1))) %>% 
+         reshape2::melt(), aes(x = value, fill = variable)) + 
+  geom_density(alpha = 0.3) +
+  labs(x = "Per-gene log mean expression level", y = "Density", fill = "Method") +
+  theme_bw()
+
+#### Distribution of 0s per gene
+ggplot(data.frame(true = rowSums(counts.true == 0), compcoder = rowSums(counts.compcoder == 0)) %>% 
+         reshape2::melt(), aes(x = value, fill = variable)) + 
+  geom_density(alpha = 0.3) +
+  labs(x = "Per-gene 0 count frequency", y = "Density", fill = "Method") +
+  theme_bw()
+
+
