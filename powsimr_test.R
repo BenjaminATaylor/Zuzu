@@ -106,13 +106,8 @@ estparam_gene <- estimateParam(countData = counts.true.tmp[c(1:50),c(10:19)],
                                GeneFilter = 0.1, SampleFilter = 3, 
                                sigma = 1.96, NCores = NULL, verbose = TRUE)
 
-# plotting
-plotParam(estParamRes = estparam_gene, Annot = T)
-
-sessionInfo()
-
-
-
+# Okay, there's some strange stuff going on here: this runs, but only with certain combinations of columns.
+# I have raised an issue on github: https://github.com/bvieth/powsimR/issues/68
 
 
 
