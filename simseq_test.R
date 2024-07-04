@@ -12,6 +12,27 @@ data.sim <- SimData(counts = counts, replic = replic, treatment = treatment,
                     k.ind = 5,  # = samples per treatment group
                     n.genes = 5000, n.diff = 1000,
                     norm.factors = nf)
+
+
+#############
+
+data.simseq = SimData(counts = counts.true, 
+                      treatment = metadata.true$phenotype,
+                      sort.method = "unpaired",
+                      switch.trt = FALSE,
+                      k.ind = floor(min(table(metadata.true$phenotype))/2),  # = samples per treatment group
+                      n.genes = nrow(counts.true), 
+                      n.diff = floor(nrow(counts.true)*0.1))
+
+# An annoying feature of this simulation is that the maximum sample size that it permits in the synthetic data is half the size of the reference group in the real data, which means e.g. for a 60-sample dataset we can only get a 30-sample simulation
+
+############
+
+
+
+
+
+
 ### Example 2: Calculate weights vector beforehand to save run time in repeated simulations
 sort.list <- SortData(counts = counts, treatment = treatment, replic = replic,
                       sort.method = "paired", norm.factors = nf)
