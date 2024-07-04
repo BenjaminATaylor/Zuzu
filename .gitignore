@@ -1,6 +1,7 @@
 \.nextflow*
 work/*
 .DS_Store
+*/.DS_Store
 output/
 docker/
 andyM_exemplar/
