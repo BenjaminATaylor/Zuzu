@@ -1,6 +1,6 @@
 **ZUZU is a work in progress!**
 
-<img width="20px" src="./images/zuzu_schema.pdf" alt="Zuzu schema" />
+<img width="30px" src="./images/zuzu_schema.png" alt="Zuzu schema" />
 
 After a user provides a gene expression dataset, Zuzu will operates on that dataset as follows. Note that except where the output of one step is necessary input for a later step, each step is run in parallel, allowing the overall pipeline to run very quickly in a cluster environment. 
 1. Differentially-expressed genes (DEGs) between a pre-specified set of conditions are identified using every analysis method individually. Notably, if the user wishes simply to identify DEGs for their dataset, either from a single method or as a consensus across multiple methods, this step alone streamlines that process to a single command. 
