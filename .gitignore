@@ -5,3 +5,5 @@ work/*
 output/
 docker/
 andyM_exemplar/
+.RData
+.Rhistory
