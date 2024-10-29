@@ -15,16 +15,18 @@ data.sim <- SimData(counts = counts, replic = replic, treatment = treatment,
 
 
 #############
-
+# Note that since we haven't specified a weights vector, the simulation will try to weight choice of DE genes based on the degree of differentiation in the real data (as I understand it)
 data.simseq = SimData(counts = counts.true, 
                       treatment = metadata.true$phenotype,
                       sort.method = "unpaired",
                       switch.trt = FALSE,
                       k.ind = floor(min(table(metadata.true$phenotype))/2),  # = samples per treatment group
+                      # k.ind = ncol(metadata.true$phenotype),  # = samples per treatment group
                       n.genes = nrow(counts.true), 
                       n.diff = floor(nrow(counts.true)*0.1))
 
-# An annoying feature of this simulation is that the maximum sample size that it permits in the synthetic data is half the size of the reference group in the real data, which means e.g. for a 60-sample dataset we can only get a 30-sample simulation
+# An annoying feature of this simulation is that the maximum sample size that it permits in the synthetic data is half the size of the reference group in the real data, which means e.g. for a 60-sample dataset we can only get a 30-sample simulation. This is a bit of a pain, but I think we can work around it by just running the simulation multiple times and concatenating the results? And then maybe half the data to bring the depth back down in line?
+
 
 ############
 

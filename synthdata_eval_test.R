@@ -3,6 +3,7 @@ library(tidyverse)
 library(DESeq2)
 library(compcodeR)
 library(DescTools)
+library(SimSeq)
 
 #### Load real data ####
 
@@ -122,10 +123,31 @@ counts.seqgendiff = counts.seqgendiff[,metadata.seqgendiff$sample]
 all(colnames(counts.seqgendiff) == metadata.seqgendiff$sample)
 
 
+## Generate another synthetic dataset using simSeq
+# Note an issue here- due to the way the simulation is set up, we can only simulate half the sample size of the real data using simSeq. For now this is just something we'll have to live with
+data.simseq = SimData(counts = counts.true, 
+                      treatment = metadata.true$phenotype,
+                      sort.method = "unpaired",
+                      switch.trt = FALSE,
+                      k.ind = floor(min(table(metadata.true$phenotype))/2),  # = samples per treatment group
+                      n.genes = nrow(counts.true), 
+                      n.diff = floor(nrow(counts.true)*0.1))
+#Get metadata
+metadata.simseq = data.simseq$treatment %>% 
+  data.frame() %>% 
+  mutate(phenotype = ifelse(. == 0, "nurse", "forager")) %>%
+  mutate(sample = paste0("sample_",row_number())) %>%
+  select(sample, phenotype)
+# Get counts data
+counts.simseq = data.simseq$counts %>% `colnames<-`(metadata.simseq$sample)
+all(colnames(counts.simseq)==metadata.simseq$sample)
+
+
+
 
 
 #### Testing dataset conformity ####
-#Now we can test how well this new dataset resembles the true dataset
+#Now we can test how well these new datasets resemble the true dataset
 
 #### First compare QQ plots of log-normalized values in the two datasets ####
 quantiles = seq(0, 1, 0.00001)
