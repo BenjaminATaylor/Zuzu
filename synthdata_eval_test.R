@@ -122,6 +122,12 @@ metadata.seqgendiff = tmp[order(tmp$phenotype),]
 counts.seqgendiff = counts.seqgendiff[,metadata.seqgendiff$sample]
 all(colnames(counts.seqgendiff) == metadata.seqgendiff$sample)
 
+# Run DESeq for the seqgendiff dataset
+dds.seqgendiff = DESeqDataSetFromMatrix(countData = counts.seqgendiff,
+                                       colData = metadata.seqgendiff,
+                                       design = ~ phenotype)
+dds.seqgendiff = DESeq(dds.seqgendiff)
+res.seqgendiff = results(dds.seqgendiff)
 
 ## Generate another synthetic dataset using simSeq
 # Note an issue here- due to the way the simulation is set up, we can only simulate half the sample size of the real data using simSeq. For now this is just something we'll have to live with
@@ -142,67 +148,83 @@ metadata.simseq = data.simseq$treatment %>%
 counts.simseq = data.simseq$counts %>% `colnames<-`(metadata.simseq$sample)
 all(colnames(counts.simseq)==metadata.simseq$sample)
 
-
+# Run DESeq for the simseq dataset
+dds.simseq = DESeqDataSetFromMatrix(countData = counts.simseq,
+                                        colData = metadata.simseq,
+                                        design = ~ phenotype)
+dds.simseq = DESeq(dds.simseq)
+res.simseq = results(dds.simseq)
 
 
 
 #### Testing dataset conformity ####
 #Now we can test how well these new datasets resemble the true dataset
+methods = c("compcoder","seqgendiff","simseq")
 
-#### First compare QQ plots of log-normalized values in the two datasets ####
+#### First compare QQ plots of log-normalized values in the datasets ####
 quantiles = seq(0, 1, 0.00001)
-qqdata.compcoder = data.frame(true = unlist(counts.true), compcoder = unlist(counts.compcoder))
-ggplot(mapping = aes(x = quantile(log(qqdata.compcoder$true+1), quantiles, type = 5), 
-                     y = quantile(log(qqdata.compcoder$compcoder+1), quantiles, type = 5))) + 
-  geom_point() +
-  geom_abline(aes(slope = 1, intercept = 0), linetype = 2)  +
-  geom_smooth(method = "lm") +
-  coord_equal() +
-  theme_bw()
 
-# Get goodness of fit metrics for the quantiles
-ccc.compcoder.log = CCC(log(qqdata.compcoder$true+1), 
-                        log(qqdata.compcoder$compcoder+1), 
-                        ci = "z-transform", conf.level = 0.95)
-ccc.compcoder.raw = CCC(qqdata.compcoder$true,
-                        qqdata.compcoder$compcoder,
-                        ci = "z-transform", conf.level = 0.95)
-# Much higher for the log-transformed values
-ccc.compcoder.log$rho.c
-ccc.compcoder.raw$rho.c
-
-# Okay now we can plot these data together?
-#pseudocode: we can either plot the qqs together,or make single plot with the qq fits for each method plotted next to each other (ideally we would have many fits from many repeated simulations, so then we could plot as a box or something like that)
-
-
-
+for(method in methods){
+  # Get the objects for the method
+  dds = get(paste0("dds.",method))
+  counts = get(paste0("counts.",method))
+  metadata = get(paste0("metadata.",method))
+  res = get(paste0("res.",method))
+  
+  qq.true = quantile(log(unlist(counts.true)+1), quantiles, type = 5)
+  qq.sim = quantile(log(unlist(counts)+1), quantiles, type = 5)
+  
+  ggplot(mapping = aes(x = qq.true, 
+                       y = qq.sim)) + 
+    geom_point() +
+    geom_abline(aes(slope = 1, intercept = 0), linetype = 2)  +
+    geom_smooth(method = "lm") +
+    coord_equal() +
+    theme_bw()
+  
+  # Get goodness of fit metrics for the quantiles
+  ccc.log = CCC(log(qq.true+1), log(qq.sim+1), ci = "z-transform", conf.level = 0.95)
+  ccc.raw = CCC(qq.true, qq.sim, ci = "z-transform", conf.level = 0.95)
+  ccc.log$rho.c
+  ccc.raw$rho.c
+  
+  out = data.frame(method = method, ccclog = ccc.log$rho.c$est, cccraw = ccc.raw$rho.c$est)
+  
+  if(method == methods[1]){
+    qqout = out
+  } else {
+    qqout = rbind(qqout, out)
+  }
+  
+  #pseudocode: we can either plot the qqs together,or make single plot with the qq fits for each method plotted    next to each other (ideally we would have many fits from many repeated simulations, so then we could plot as a   box or something like that)
+}
 # (Note that for these sample sizes, K-S tests are too sensitive to be of much use)
 
-#### Next compare BCV vs dispersion plots ####
-plotDispEsts(dds.true)
-plotDispEsts(dds.compcoder)
+# #### Next compare BCV vs dispersion plots ####
+# plotDispEsts(dds.true)
+# plotDispEsts(dds.compcoder)
+# 
+# # We can extract the parameters of the two dispersion functions, although I'm not sure that there's a statistical test we can apply here
+# dispersionFunction(dds.true)
+# dispersionFunction(dds.compcoder)
 
-# We can extract the parameters of the two dispersion functions, although I'm not sure that there's a statistical test we can apply here
-dispersionFunction(dds.true)
-dispersionFunction(dds.compcoder)
 
-
-#### Next compare means vs variance plots ####
-# mean of log2 expression and variance of log2 expression
-rowVars = function(x) apply(x, 1, var)
-
-meanvar.true = data.frame(mean = rowMeans(log2(counts.true+1)),
-                         var = rowVars(log2(counts.true+1)))
-meanvar.compcoder = data.frame(mean = rowMeans(log2(counts.compcoder+1)),
-                               var = rowVars(log2(counts.compcoder+1)))
-
-# Again, we can visually compare but extracting a statistical test is more difficult
-ggplot(meanvar.true, aes(x = mean, y = var)) + 
-  geom_point() +
-  geom_smooth(method = "gam")
-ggplot(meanvar.compcoder, aes(x = mean, y = var)) + 
-  geom_point() +
-  geom_smooth(method = "gam")
+# #### Next compare means vs variance plots ####
+# # mean of log2 expression and variance of log2 expression
+# rowVars = function(x) apply(x, 1, var)
+# 
+# meanvar.true = data.frame(mean = rowMeans(log2(counts.true+1)),
+#                          var = rowVars(log2(counts.true+1)))
+# meanvar.compcoder = data.frame(mean = rowMeans(log2(counts.compcoder+1)),
+#                                var = rowVars(log2(counts.compcoder+1)))
+# 
+# # Again, we can visually compare but extracting a statistical test is more difficult
+# ggplot(meanvar.true, aes(x = mean, y = var)) + 
+#   geom_point() +
+#   geom_smooth(method = "gam")
+# ggplot(meanvar.compcoder, aes(x = mean, y = var)) + 
+#   geom_point() +
+#   geom_smooth(method = "gam")
 
 #### Next check if feature-feature correlations are preserved ####
 # Take a subsample of genes, since doing this for all pairwise comparisons would be too computationally intense
@@ -212,49 +234,76 @@ varied.counts.subset.true = varied.counts.true[sample(nrow(varied.counts.true), 
 corrs.mat.true = cor(t(varied.counts.subset.true), method = "spearman")
 corrs.true = corrs.mat.true[lower.tri(corrs.mat.true)]
 
-# Repeat for compcoder
-varied.counts.compcoder = counts.compcoder[which(rowVars(log2(counts.compcoder+1))!=0),] 
-varied.counts.subset.compcoder = varied.counts.compcoder[sample(nrow(varied.counts.compcoder), 500),]
-# Get pairwise spearman cor between each pair of genes
-corrs.mat.compcoder = cor(t(varied.counts.subset.compcoder), method = "spearman")
-corrs.compcoder = corrs.mat.compcoder[lower.tri(corrs.mat.compcoder)]
+# Generalise across methods
+for(method in methods){
+  
+  # Get the objects for the method
+  counts = get(paste0("counts.",method))
+  
+  # Repeat for compcoder
+  varied.counts = counts[which(rowVars(log2(counts+1))!=0),] 
+  varied.counts.subset = varied.counts[sample(nrow(varied.counts), 500),]
+  # Get pairwise spearman cor between each pair of genes
+  corrs.mat = cor(t(varied.counts.subset), method = "spearman")
+  corrs = corrs.mat[lower.tri(corrs.mat)]
+  
+  corrs.ggdata = data.frame(true = corrs.true, compcoder = corrs) %>% 
+    reshape2::melt()
+  ggplot(corrs.ggdata, aes(x = variable, y = value)) + 
+    geom_violin() +
+    theme_bw()
 
-corrs.ggdata = data.frame(true = corrs.true, compcoder = corrs.compcoder) %>% 
-  reshape2::melt()
-ggplot(corrs.ggdata, aes(x = variable, y = value)) + 
-  geom_violin() +
-  theme_bw()
+  # A simple t-test and also K-S test
+  t.test(corrs.ggdata$value ~ corrs.ggdata$variable)
+  ks.test(corrs.true, corrs)
+  # A better was of testing this might be the Wasserstein distance?
+  library("transport")
+  wasserstein1d(a = corrs.true, b = corrs)
+  
+  out = data.frame(method = method, wasserstein = wasserstein1d(a = corrs.true, b = corrs))
+  
+  if(method == methods[1]){
+    corrsout = out
+  } else {
+    corrsout = rbind(corrsout, out)
+  }
+}
 
-# A simple t-test and also K-S test
-t.test(corrs.ggdata$value ~ corrs.ggdata$variable)
-ks.test(corrs.true, corrs.compcoder)
-# A better was of testing this might be the Wasserstein distance?
-library("transport")
-wasserstein1d(a = corrs.true, b = corrs.compcoder)
+corrsout
+
+
 
 #### Volcano plots ####
-# We can also compare the volcano plots of the two datasets
+# We can also compare the volcano plots of the datasets
 
-res.true %>% data.frame() %>%
+volcdat.true <- res.true %>% data.frame() %>%
   mutate(DEG = (padj<0.05 & abs(log2FoldChange)>1)) %>% 
-  ggplot(aes(x = log2FoldChange, y = -log10(padj), color = DEG)) + 
+  mutate(method = "true")
+
+for(method in methods){
+  
+  volcdat <- get(paste0("res.",method)) %>% data.frame() %>%
+    mutate(DEG = (padj<0.05 & abs(log2FoldChange)>1)) %>%
+    mutate(method = method)
+  
+  if(method == methods[1]){
+    volcdats = rbind(volcdat.true, volcdat)
+  } else {
+    volcdats = rbind(volcdats, volcdat)
+  }
+}
+#plot
+volcdats = mutate(volcdats, method = factor(method, levels = c("true",methods)))
+ggplot(volcdats,aes(x = log2FoldChange, y = -log10(padj), color = DEG)) + 
   geom_point(alpha = 0.7) +
   scale_color_manual(values = c("black","red")) +
   geom_vline(xintercept = c(-1,1), linetype = 2) +
   geom_hline(yintercept = -log10(0.05), linetype = 2) +
-  theme_bw()
-
-res.compcoder %>% data.frame() %>%
-  mutate(DEG = (padj<0.05 & abs(log2FoldChange)>1)) %>% 
-  ggplot(aes(x = log2FoldChange, y = -log10(padj), color = DEG)) + 
-  geom_point(alpha = 0.7) +
-  scale_color_manual(values = c("black","red")) +
-  geom_vline(xintercept = c(-1,1), linetype = 2) +
-  geom_hline(yintercept = -log10(0.05), linetype = 2) +
-  theme_bw()
+  theme_bw() +
+  facet_wrap(~method)
 
 #### Also generate PCAs for each method ####
-counts_pca = function(counts, metadata){
+data_pca = function(counts, metadata, method = "true"){
   
   pca.counts = log2(counts+1)
   data.pca = prcomp(t(pca.counts))
@@ -263,37 +312,63 @@ counts_pca = function(counts, metadata){
                  percent.var = percent.var)
   #connect to phenotypic data
   ggpcadata = pca.out$values %>%
+    select(paste0("PC",c(1:4))) %>%
     rownames_to_column(var = "sample") %>%
-    left_join(metadata, by = "sample")
+    left_join(metadata, by = "sample") %>%
+    mutate(method = method)
   
-  print(pca.plot <- ggplot(ggpcadata, aes(x = PC1, y = PC2, color = phenotype)) +
-          geom_point(size = 5, position = position_jitter(width = 0.5,height=0.5)) +
-          #geom_text(vjust = -1) +
-          xlab(paste0("PC",1,"( ",signif(pca.out$percent.var[1]*100, 3),"%)")) +
-          ylab(paste0("PC",2,"( ",signif(pca.out$percent.var[2]*100, 3),"%)")) +
-          theme_bw() +
-          theme(aspect.ratio = 1,
-                panel.grid = element_line(color = "grey95"),
-                legend.text = element_text(size = 12),
-                legend.title = element_text(face = "bold", size = 15),
-                axis.text.x = element_text(size = 12),
-                axis.text.y = element_text(size = 12),
-                axis.title = element_text(face = "bold", size =12)))
+  return(ggpcadata)
 }
 
-counts_pca(counts.true, metadata.true)
-counts_pca(counts.compcoder, metadata.compcoder)
+for(method in c("true",methods)){
+  
+  ggpcadata = data_pca(get(paste0("counts.",method)), get(paste0("metadata.",method)), method)
+  
+  if(method == "true"){
+    ggpcadataout = ggpcadata
+  } else {
+    ggpcadataout = rbind(ggpcadataout, ggpcadata)
+  }
+  
+}
+
+# reorder for plotting
+ggpcadataout = mutate(ggpcadataout, method = factor(method, levels = c("true",methods)))
+# Plot
+print(pca.plot <- ggplot(ggpcadataout, aes(x = PC1, y = PC2, color = phenotype)) +
+        geom_point(size = 5, position = position_jitter(width = 0.5,height=0.5)) +
+        #geom_text(vjust = -1) +
+        xlab("PC1") + ylab("PC2") +
+        theme_bw() +
+        facet_wrap(~method) +
+        theme(aspect.ratio = 1,
+              panel.grid = element_line(color = "grey95"),
+              legend.text = element_text(size = 12),
+              legend.title = element_text(face = "bold", size = 15),
+              axis.text.x = element_text(size = 12),
+              axis.text.y = element_text(size = 12),
+              axis.title = element_text(face = "bold", size =12)))
 
 #### Check per-gene expression level distributions ####
-logs.true = rowMeans(log(counts.true+1))
-logs.compcoder = rowMeans(log(counts.compcoder+1))
-
-ggplot(data.frame(true = logs.true, compcoder = logs.compcoder) %>% 
-         reshape2::melt(), aes(x = value, fill = variable)) + 
+logs.true = data.frame(value = rowMeans(log(counts.true+1)), method = "true")
+for(method in methods){
+  counts = get(paste0("counts.",method))
+  logs = data.frame(value = rowMeans(log(counts+1)), method = method)
+  if(method == methods[1]){
+    logsout = rbind(logs, logs.true)
+  } else {
+    logsout = rbind(logsout, logs)
+  }
+}
+logsout = mutate(logsout, method = factor(method, levels = c("true",methods)))
+ggplot(logsout, aes(x = value, fill = "grey90")) +
   geom_density(alpha = 0.3) +
-  labs(x = "Per-gene log mean expression level", y = "Density", fill = "Method") +
-  theme_bw()
+  scale_fill_discrete(guide = "none") +
+  labs(x = "Per-gene log mean expression level", y = "Density") +
+  theme_bw() +
+  facet_wrap(~method)
 
+# Some per-method comparison stats
 t.test(logs.true, logs.compcoder)
 ks.test(logs.true, logs.compcoder)
 wasserstein1d(a = logs.true, b = logs.compcoder)
