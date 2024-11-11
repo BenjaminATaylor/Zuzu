@@ -115,7 +115,7 @@ counts.seqgendiff = thout$mat %>%
 # Extract metadata
 tmp = thout$designmat %>% 
   data.frame() %>% 
-  mutate(phenotype = ifelse(P1 == 0, "nurse", "forager")) %>%
+  mutate(phenotype = factor(ifelse(P1 == 0, "nurse", "forager"), levels = c("nurse","forager"))) %>%
   mutate(sample = paste0("sample_",1:nrow(.))) %>%
   select(sample, phenotype)
 metadata.seqgendiff = tmp[order(tmp$phenotype),]
@@ -200,31 +200,102 @@ for(method in methods){
 }
 # (Note that for these sample sizes, K-S tests are too sensitive to be of much use)
 
-# #### Next compare BCV vs dispersion plots ####
-# plotDispEsts(dds.true)
-# plotDispEsts(dds.compcoder)
-# 
-# # We can extract the parameters of the two dispersion functions, although I'm not sure that there's a statistical test we can apply here
-# dispersionFunction(dds.true)
-# dispersionFunction(dds.compcoder)
+#### Next compare BCV vs dispersion plots ####
+plotDispEsts2 <- function(dds){
+  as.data.frame(mcols(dds)) %>% 
+    select(baseMean, dispGeneEst, dispFit, dispersion) %>%
+    melt(id.vars="baseMean") %>% 
+    filter(baseMean>0) %>% 
+    ggplot(aes(x=baseMean, y=value, colour=variable)) + 
+    geom_point(size=0.1) +
+    scale_x_log10() + 
+    scale_y_log10() + 
+    theme_bw() + 
+    ylab("Dispersion") + 
+    xlab("BaseMean") +
+    scale_colour_manual(
+      values=c("Black", "#e41a1c", "#377eb8"), 
+      breaks=c("dispGeneEst", "dispFit", "dispersion"), 
+      labels=c("Estimate", "Fit", "Final"),
+      name=""
+    ) +
+    guides(colour = guide_legend(override.aes = list(size=2)))
+}
 
+mcols.true = as.data.frame(mcols(dds)) %>% 
+  select(baseMean, dispGeneEst, dispFit, dispersion) %>%
+  mutate(method = "true")
 
-# #### Next compare means vs variance plots ####
-# # mean of log2 expression and variance of log2 expression
-# rowVars = function(x) apply(x, 1, var)
-# 
-# meanvar.true = data.frame(mean = rowMeans(log2(counts.true+1)),
-#                          var = rowVars(log2(counts.true+1)))
-# meanvar.compcoder = data.frame(mean = rowMeans(log2(counts.compcoder+1)),
-#                                var = rowVars(log2(counts.compcoder+1)))
-# 
-# # Again, we can visually compare but extracting a statistical test is more difficult
-# ggplot(meanvar.true, aes(x = mean, y = var)) + 
-#   geom_point() +
-#   geom_smooth(method = "gam")
-# ggplot(meanvar.compcoder, aes(x = mean, y = var)) + 
-#   geom_point() +
-#   geom_smooth(method = "gam")
+for(method in methods){
+  
+  dds = get(paste0("dds.",method))
+  mcols = as.data.frame(mcols(dds)) %>% 
+    select(baseMean, dispGeneEst, dispFit, dispersion) %>%
+    mutate(method = method)
+  
+  if(method == methods[1]){
+    mcolsout = rbind(mcols.true, mcols)
+  } else {
+    mcolsout = rbind(mcolsout, mcols)
+  }
+  
+}
+
+mcolsout%>% 
+  melt(id.vars=c("baseMean","method")) %>% 
+  mutate(method = factor(method, levels = c("true",methods))) %>%
+  filter(baseMean>0) %>% 
+  ggplot(aes(x=baseMean, y=value, colour=variable)) + 
+  geom_point(size=0.1) +
+  scale_x_log10() + 
+  scale_y_log10() + 
+  theme_bw() + 
+  ylab("Dispersion") + 
+  xlab("BaseMean") +
+  scale_colour_manual(
+    values=c("Black", "#e41a1c", "#377eb8"), 
+    breaks=c("dispGeneEst", "dispFit", "dispersion"), 
+    labels=c("Estimate", "Fit", "Final"),
+    name=""
+  ) +
+  facet_wrap(~method) +
+  guides(colour = guide_legend(override.aes = list(size=2)))
+
+# We can extract the parameters of the two dispersion functions, although I'm not sure that there's a statistical test we can apply here
+dispersionFunction(dds.true)
+dispersionFunction(dds.compcoder)
+
+#### Next compare means vs variance plots ####
+# mean of log2 expression and variance of log2 expression
+rowVars = function(x) apply(x, 1, var)
+
+meanvar.true = data.frame(mean = rowMeans(log2(counts.true+1)),
+                         var = rowVars(log2(counts.true+1)),
+                         method = "true")
+
+for(method in methods){
+  
+  counts = get(paste0("counts.",method))
+  meanvar = data.frame(mean = rowMeans(log2(counts+1)),
+                       var = rowVars(log2(counts+1)),
+                       method = method)
+  
+  if(method == methods[1]){
+    meanvarout = rbind(meanvar.true, meanvar)
+  } else {
+    meanvarout = rbind(meanvarout, meanvar)
+  }
+  
+}
+
+meanvarout = mutate(meanvarout, method = factor(method, levels = c("true",methods)))
+
+# Again, we can visually compare but extracting a statistical test is more difficult
+ggplot(meanvarout, aes(x = mean, y = var)) +
+  geom_point() +
+  geom_smooth(method = "gam") +
+  facet_wrap(~method)
+
 
 #### Next check if feature-feature correlations are preserved ####
 # Take a subsample of genes, since doing this for all pairwise comparisons would be too computationally intense
@@ -354,12 +425,21 @@ logs.true = data.frame(value = rowMeans(log(counts.true+1)), method = "true")
 for(method in methods){
   counts = get(paste0("counts.",method))
   logs = data.frame(value = rowMeans(log(counts+1)), method = method)
+  
+  # A simple t-test and also K-S test
+  t.test(logs.true$value, logs$value)
+  suppressWarnings(ks.test(logs.true$value, logs$value))
+  out = data.frame(method = method, wasserstein = wasserstein1d(a = logs.true$value, b = logs$value))
+
   if(method == methods[1]){
     logsout = rbind(logs, logs.true)
+    logcompsout = out
   } else {
     logsout = rbind(logsout, logs)
+    logcompsout = rbind(logcompsout, out)
   }
 }
+
 logsout = mutate(logsout, method = factor(method, levels = c("true",methods)))
 ggplot(logsout, aes(x = value, fill = "grey90")) +
   geom_density(alpha = 0.3) +
@@ -367,38 +447,65 @@ ggplot(logsout, aes(x = value, fill = "grey90")) +
   labs(x = "Per-gene log mean expression level", y = "Density") +
   theme_bw() +
   facet_wrap(~method)
-
-# Some per-method comparison stats
-t.test(logs.true, logs.compcoder)
-ks.test(logs.true, logs.compcoder)
-wasserstein1d(a = logs.true, b = logs.compcoder)
+logcompsout
 
 
 #### Distribution of 0s per gene
-zeros.true = rowSums(counts.true == 0)
-zeros.compcoder = rowSums(counts.compcoder == 0)
+zeros.true = data.frame(value = rowSums(counts.true == 0), method = "true")
 
-ggplot(data.frame(true = zeros.true, compcoder = zeros.compcoder) %>% 
-         reshape2::melt(), aes(x = value, fill = variable)) + 
+for(method in methods){
+  counts = get(paste0("counts.",method))
+  zeros = data.frame(value = rowSums(counts == 0), method = method)
+
+  out = data.frame(method = method, wasserstein = wasserstein1d(a = zeros.true$value, b = zeros$value))
+  
+  if(method == methods[1]){
+    zerosout = rbind(zeros, zeros.true)
+    zeroscompsout = out
+  } else {
+    zerosout = rbind(zerosout, zeros)
+    zeroscompsout = rbind(zeroscompsout, out)
+  }
+}
+
+zerosout = mutate(zerosout, method = factor(method, levels = c("true",methods)))
+ggplot(zerosout, aes(x = value, fill = "grey90")) + 
   geom_density(alpha = 0.3) +
+  scale_fill_discrete(guide = "none") +
   labs(x = "Per-gene 0 count frequency", y = "Density", fill = "Method") +
-  theme_bw()
+  theme_bw() +
+  facet_wrap(~method)
+zeroscompsout
 
-t.test(zeros.true, zeros.compcoder)
-ks.test(zeros.true, zeros.compcoder)
-wasserstein1d(a = zeros.true, b = zeros.compcoder)
 
 
 #### Distribution of per-gene variances
-vars.true = log(meanvar.true$var+1)
-vars.compcoder = log(meanvar.compcoder$var+1)
+vars.true = data.frame(value = log(meanvar.true$var+1), method = "true")
 
-ggplot(data.frame(true = vars.true, compcoder = vars.compcoder) %>% 
-         reshape2::melt(), aes(x = value, fill = variable)) + 
+for(method in methods){
+  
+  counts = get(paste0("counts.",method))
+  meanvar = data.frame(mean = rowMeans(log2(counts+1)),
+                       var = rowVars(log2(counts+1)))
+  vars = data.frame(value = log(meanvar$var+1), method = method)
+  
+  out = data.frame(method = method, wasserstein = wasserstein1d(a = vars.true$value, b = vars$value))
+  
+  if(method == methods[1]){
+    varsout = rbind(vars, vars.true)
+    varscompsout = out
+  } else {
+    varsout = rbind(varsout, vars)
+    varscompsout = rbind(varscompsout, out)
+  }
+
+}
+
+varsout = mutate(varsout, method = factor(method, levels = c("true",methods)))
+ggplot(varsout, aes(x = value, fill = "grey50")) +
+  scale_fill_discrete(guide = "none") +
   geom_density(alpha = 0.3) +
   labs(x = "Per-gene log variance", y = "Density", fill = "Method") +
-  theme_bw()
+  theme_bw() +
+  facet_wrap(~method)
 
-t.test(vars.true, vars.compcoder)
-ks.test(vars.true, vars.compcoder)
-wasserstein1d(a = vars.true, b = vars.compcoder)
