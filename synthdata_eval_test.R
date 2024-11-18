@@ -508,5 +508,18 @@ print(ggvars <- ggplot(varsout, aes(x = value, fill = "grey50")) +
 
 #### Summarise ####
 # combine tabular outputs
-cbind(qqout, meanvarcompout, corrsout, logcompsout, zeroscompsout,varscompsout)
- 
+dat = cbind(qqout, meanvarcompout, corrsout, logcompsout, zeroscompsout,varscompsout)
+dat = dat[, !duplicated(colnames(dat))] 
+
+#transpose and convert to a heatmap
+dat %>% 
+  select(-c("method")) %>%
+  apply(., 2, scale) %>%
+  data.frame() %>%
+  mutate(method = dat$method) %>% 
+  reshape2::melt() %>%
+  ggplot(aes(y = variable, x = method, fill = value)) +
+  geom_tile() 
+
+
+rownames(dat) = c("CCC log", "CCC raw", , "Wasserstein corrs", "Wasserstein expressions", "Wasserstein zeros", "Wasserstein vars")
