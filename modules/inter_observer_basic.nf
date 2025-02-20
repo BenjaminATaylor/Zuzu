@@ -3,6 +3,7 @@ process INTER_OBSERVER_BASIC{
   debug false
 
   publishDir "$params.outdir"
+  label 'mid_job'
 
   input:
   path deseq_table
