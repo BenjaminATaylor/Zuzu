@@ -37,11 +37,6 @@ include { FULLSYNTH_PLOTS } from './modules/fullsynth_plots.nf'
 
 //exit 1, 'DEBUG'
 
-// Validate inputs
-if (params.samplesheet) { ch_samplesheet = file(params.samplesheet) } else { exit 1, 'Input samplesheet not specified!' }
-if (params.countsframe) { ch_countsframe = file(params.countsframe) } else { exit 1, 'Input count frame not specified!' }
-if (params.reflevel) { ch_reflevel = params.reflevel } else { exit 1, 'Reference level not specified!' }
-
 // Set number of permutations for fakey datasets
 params.nperms = 7
 
@@ -52,18 +47,24 @@ params.synthstep = true
 params.pareml = false
 params.mlstep = true
 
-println("Sample sheet: " + ch_samplesheet)
-println("Counts matrix: " + ch_countsframe)
-println("Reference level: " + ch_reflevel)
-
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
 
-// Set a vector of depths across which to generate fullsynth datasets
-depths = Channel.from(1e5, 1e6, 1e7)
-dummypath = Channel.fromPath( "0" )
-
 workflow {
+  
+  // Validate inputs
+  if (params.samplesheet) { ch_samplesheet = file(params.samplesheet)    } else { exit 1, 'Input samplesheet not specified!' }
+  if (params.countsframe) { ch_countsframe = file(params.countsframe)    } else { exit 1, 'Input count frame not specified!' }
+  if (params.reflevel   ) { ch_reflevel    = params.reflevel             } else { exit 1, 'Reference level not specified!'   }
+  
+  println("Sample sheet: " + ch_samplesheet)
+  println("Counts matrix: " + ch_countsframe)
+  println("Reference level: " + ch_reflevel)
+  
+  // Set a vector of depths across which to generate fullsynth datasets
+  depths = Channel.from(1e5, 1e6, 1e7)
+  dummypath = Channel.fromPath( "0" )
+  
   //Initial data QC and cleanup
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
   QUALITYCONTROL(CLEANINPUTS.out)
