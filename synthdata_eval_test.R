@@ -317,9 +317,9 @@ for(method in methods){
   
   corrs.ggdata = data.frame(true = corrs.true, compcoder = corrs) %>% 
     reshape2::melt()
-  ggplot(corrs.ggdata, aes(x = variable, y = value)) + 
+  print(ggplot(corrs.ggdata, aes(x = variable, y = value)) + 
     geom_violin() +
-    theme_bw()
+    theme_bw())
 
   # A simple t-test and also K-S test
   t.test(corrs.ggdata$value ~ corrs.ggdata$variable)
