@@ -6,7 +6,7 @@ nextflow run main.nf \
     --countsframe "input/test2/salmon.merged.gene_counts.tsv" \
     --reflevel "nurse" \
     --outdir "output" \
-    --nperms 20 \
+    --nperms 3 \
     --truecutoff 0.00001 \
     --synthstep true \
     --synthdeg_pct 0.1 \

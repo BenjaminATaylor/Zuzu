@@ -9,17 +9,6 @@ countsframe.clean = read.csv("countsframe_clean.csv", row.names = 1, check.names
 
 # Permute colnames at random while preserving gene counts
 set.seed(1)
-permcols = sample(colnames(countsframe.clean),replace = FALSE)
-countsframe.perm = countsframe.clean %>% `colnames<-`(permcols)
-1 = samplesheet[match(samplesheet$sample, permcols),]
-
-#We want to edit this so that each row is permuted independently
-permute_fun = function(x){data.frame(t(unname(sample(x))))}
-permute_fun(countsframe.clean[1,])
-countsframe.perm = apply(countsframe.clean, 1, permute_fun) %>% 
-  bind_rows(., .id = "column_label") %>%
-  `colnames<-`(permcols)
-
 permute_fun = function(x){
   for(i in 1:100){ # NB if we don't get a proper permutation after 100 runs, we give up because the sample sizes are obviously inappropriate
     # Permute and check whether any of the newly permuted rows have perfectly recaptured the original groupings
