@@ -10,6 +10,7 @@ process CREATE_BREAKS {
   //env refouts, emit: refouts
   //env altouts, emit: altouts
 
+  script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse", quietly = TRUE)

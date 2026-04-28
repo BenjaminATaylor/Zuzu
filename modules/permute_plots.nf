@@ -17,6 +17,7 @@ process PERMUTE_PLOTS{
   output:
   path "permute_plot.pdf"
 
+  script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse", quietly = TRUE)

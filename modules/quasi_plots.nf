@@ -11,6 +11,7 @@ process QUASI_PLOTS{
   output:
   path "quasi_plot.pdf"
 
+  script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse", quietly = TRUE)

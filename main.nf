@@ -77,8 +77,8 @@ workflow {
   println("Reference level: " + ch_reflevel)
 
   // Set a vector of depths across which to generate fullsynth datasets
-  depths = Channel.from(1E+5, 1E+6, 1E+7)
-  dummypath = Channel.fromPath("0")
+  depths = channel.from(1E+5, 1E+6, 1E+7)
+  dummypath = channel.fromPath("0")
 
   //Initial data QC and cleanup
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
@@ -96,7 +96,7 @@ workflow {
   }
 
   ////Permutation analysis with no true signal
-  perms = Channel.from(1..params.nperms)
+  perms = channel.from(1..params.nperms)
   DATA_PERMUTE(CLEANINPUTS.out, perms)
   // For DESeq
   DESEQ_PERMUTE(DATA_PERMUTE.out.frames)

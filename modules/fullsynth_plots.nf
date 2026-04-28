@@ -12,6 +12,7 @@ process FULLSYNTH_PLOTS {
     output:
     path "synth_plot.pdf"
 
+    script:
     """
     #!/usr/bin/env Rscript
     library("tidyverse", quietly = TRUE)
