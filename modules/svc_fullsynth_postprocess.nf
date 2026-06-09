@@ -38,7 +38,13 @@ process SVC_FULLSYNTH_POSTPROCESS{
     allgenes = row.names(inframe)
     truelabels = as.numeric(allgenes %in% truedegs)
     labels = as.numeric(allgenes %in% degs)
-    AUC = auc(truelabels, labels)
+    # If all genes are selected (e.g. in pare mode), the predictor has no variation
+    # and AUC is undefined — treat as no discrimination ability (AUC = 0.5)
+    if (length(unique(truelabels)) < 2) {
+      AUC = 0.5
+    } else {
+      AUC = auc(truelabels, labels)
+    }
     # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
     normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
 

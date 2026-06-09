@@ -3,10 +3,10 @@ process QUASI_PLOTS{
   publishDir "$params.outdir"
 
   input:
-  val deseq_quasis
-  val edger_quasis
-  val wilcox_quasis
-  val svm_quasis
+  path(deseq_quasis,  stageAs: 'deseq/outframe_?.csv')
+  path(edger_quasis,  stageAs: 'edger/outframe_?.csv')
+  path(wilcox_quasis, stageAs: 'wilcox/outframe_?.csv')
+  path(svm_quasis,    stageAs: 'svc/outframe_?.csv')
 
   output:
   path "quasi_plot.pdf"
@@ -17,77 +17,31 @@ process QUASI_PLOTS{
   library("tidyverse", quietly = TRUE)
   library("reshape2", quietly = TRUE)
 
-  deseq.inlist = str_remove_all("$deseq_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
+  read_quasis = function(dir, label){
+    lapply(list.files(dir, full.names = TRUE), read.csv) %>%
+      bind_rows() %>%
+      mutate_all(as.numeric) %>%
+      mutate(method = label) %>%
+      melt(id.vars = c("method", "samplenum"))
+  }
 
-  deseq.quasi.input = 
-    sapply(deseq.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "DESeq2") %>% 
-    melt(id.vars = c("method","samplenum"))
-
-  edger.inlist = str_remove_all("$edger_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-
-  edger.quasi.input = 
-    sapply(edger.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "edgeR") %>% 
-    melt(id.vars = c("method","samplenum"))
-
-  wilcox.inlist = str_remove_all("$wilcox_quasis","[\\\\[\\\\] ]") %>% 
-    strsplit(split = ",") %>% unlist()
-
-  wilcox.quasi.input = 
-    sapply(wilcox.inlist, read.csv) %>% 
-    t() %>% 
-    `row.names<-`(NULL) %>% 
-    data.frame() %>%
-    mutate_all(as.numeric) %>%
-    mutate(method = "wilcox") %>% 
-    melt(id.vars = c("method","samplenum"))
-        
-#  # Only include ML outputs if specified by user
-#  if("$params.mlstep" == "true"){
-#    svm.inlist = str_remove_all("$svm_quasis","[\\\\[\\\\] ]") %>% 
-#      strsplit(split = ",") %>% unlist()
-#
-#    svm.quasi.input = 
-#      sapply(svm.inlist, read.csv) %>% 
-#      t() %>% 
-#      `row.names<-`(NULL) %>% 
-#      data.frame() %>%
-#      mutate_all(as.numeric) %>%
-#      mutate(method = "svm") %>% 
-#      melt(id.vars = c("method","samplenum"))
-#
-#    gg.quasi.input = rbind(deseq.quasi.input, 
-#                            edger.quasi.input,
-#                            wilcox.quasi.input,
-#                            svm.quasi.input)
-#  } else {
-    gg.quasi.input = rbind(deseq.quasi.input, 
-                            edger.quasi.input,
-                            wilcox.quasi.input)
-#}
+  gg.quasi.input = rbind(
+    read_quasis("deseq",  "DESeq2"),
+    read_quasis("edger",  "edgeR"),
+    read_quasis("wilcox", "Wilcoxon")
+  )
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
     scale_y_continuous(limits = c(0,1)) +
-    labs(x = "Method",y = "Replicates per group") +
+    labs(x = "Method", y = "Replicates per group") +
     facet_grid(samplenum~variable) +
     theme_bw() +
     theme(strip.background = element_blank())
 
-  ggsave(gg.quasi, 
+  ggsave(gg.quasi,
      filename = "quasi_plot.pdf",
      device = "pdf", bg = "transparent",
-     width =  35, height = 20, units = "cm")
+     width = 35, height = 20, units = "cm")
   """
 }

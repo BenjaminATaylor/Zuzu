@@ -67,7 +67,7 @@ process SVC_BASIC{
       cv=cv,
       scoring="accuracy",
       min_features_to_select=1,
-      n_jobs=-1,
+      n_jobs=$params.njobs,
       verbose=2
   )
 
