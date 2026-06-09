@@ -4,7 +4,7 @@ work/*
 */.DS_Store
 input/.DS_Store
 output/
-docker/
 andyM_exemplar/
 .RData
 .Rhistory
+WHATIDID.txt

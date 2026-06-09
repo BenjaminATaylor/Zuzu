@@ -17,6 +17,7 @@ process INTER_OBSERVER_BASIC{
   path "basic_overlap_violins.pdf"
   path "deseq_poorfits.RData", emit: deseq_poorfits
 
+    script:
     """
     #!/usr/bin/env Rscript
     library("tidyverse", quietly = TRUE)
