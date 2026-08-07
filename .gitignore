@@ -8,3 +8,5 @@ andyM_exemplar/
 .RData
 .Rhistory
 WHATIDID.txt
+.zuzu-smoke.*
+tests/.smoke-plots/
