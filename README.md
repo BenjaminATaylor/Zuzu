@@ -12,4 +12,4 @@ After a user provides a gene expression dataset, Zuzu will operates on that data
 
 Run `./tests/smoke.sh` from any directory to exercise input cleaning, QC, the three non-ML baseline methods, null permutation, quasi-permutation, aggregation, and plotting. The smoke run uses the compact tracked synthetic fixture, disables SVC and full-synthetic benchmarking, and keeps all work and outputs in a temporary directory.
 
-Nextflow and a running Docker daemon are required. Failed runs are retained for inspection; set `KEEP_SMOKE=1` to retain a successful run as well. Set `SMOKE_NPERMS=5` for the slower path that also exercises generation of `permute_violins.pdf` as a real PDF.
+Nextflow and a running Docker daemon are required. Valid plots from the latest successful run are copied to `tests/.smoke-plots/`, which is ignored by Git. Failed runs are retained for inspection; set `KEEP_SMOKE=1` to retain a successful run's complete temporary work tree as well. Set `SMOKE_NPERMS=5` for the slower path that also exercises and retains `permute_violins.pdf` as a real PDF.
