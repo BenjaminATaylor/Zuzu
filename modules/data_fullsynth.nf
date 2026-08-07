@@ -4,7 +4,7 @@ process DATA_FULLSYNTH{
 
     input: 
     tuple val(x), val(refnum), val(altnum), val(depth)
-    path countsframe
+    path(countsframe, stageAs: 'staged_inputs/source_countsframe.tsv')
 
     output:
     tuple val(depth),

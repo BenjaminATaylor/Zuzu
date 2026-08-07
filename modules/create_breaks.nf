@@ -3,7 +3,7 @@ process CREATE_BREAKS {
   label 'small_job'
   
   input:
-  path samplesheet
+  path(samplesheet, stageAs: 'staged_inputs/source_samplesheet.csv')
 
   output:
   file 'breaks.csv'

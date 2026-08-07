@@ -1,6 +1,6 @@
 # Known issues
 
-Zuzu is an in-development research pipeline. The issues below apply to the current `dev` implementation and are grouped from highest to lowest severity.
+Zuzu is an in-development research pipeline. Active issues below apply to the current `dev` implementation and are grouped from highest to lowest severity. Resolved issues are retained at the end for traceability.
 
 - **Critical:** can corrupt source data or invalidate a central benchmark.
 - **High:** can produce materially incorrect or misleading scientific results.
@@ -10,14 +10,6 @@ Zuzu is an in-development research pipeline. The issues below apply to the curre
 Until the critical and high-severity issues are resolved, benchmark results should be treated as exploratory.
 
 ## Critical
-
-### KI-001: Input cleaning can overwrite source files
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) stages inputs under their original basenames, but writes fixed outputs named `samplesheet.csv` and `countsframe_clean.csv`. Under Nextflow's current/default symlink staging mode, if an input already has either output name, R writes through the staged symlink and modifies the source file. The common input name `samplesheet.csv` has already triggered this behaviour in an existing work directory.
-
-[`CREATE_BREAKS`](modules/create_breaks.nf) also reads the original sample sheet concurrently, so a collision creates a read/write race in addition to source-data corruption.
-
-Impact: user input and provenance can be silently altered, and different tasks may observe different file contents during the same run.
 
 ### KI-002: Quasi-permutation truth is circular and method-specific
 
@@ -240,3 +232,11 @@ The R/e1071 SVM modules remain under `modules/`, but their includes and calls ar
 ### KI-036: Documentation and repository status are incomplete
 
 The README provides the scientific concept but not installation instructions, a complete parameter reference, formal input/output schemas, expected resource use, troubleshooting guidance, or interpretation cautions. Prototype scripts and generated research artifacts are not clearly distinguished from supported pipeline components.
+
+## Resolved
+
+### KI-001: Input staging could overwrite source files
+
+Resolved 2026-08-07. [`CLEANINPUTS`](modules/cleaninputs.nf), [`CREATE_BREAKS`](modules/create_breaks.nf), and [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now stage direct user inputs under controlled names in a `staged_inputs/` subdirectory. Their fixed task outputs therefore cannot share a path with, or write through, a staged source symlink.
+
+Regression coverage deliberately uses the colliding input names `samplesheet.csv` and `countsframe_clean.csv`, verifies immutable snapshots after the run, and passed under Nextflow's symlink staging mode. An extended synthetic run also passed with inputs named `breaks.csv` and `synthcounts.csv`; the source checksums remained unchanged.

@@ -29,9 +29,35 @@ docker info >/dev/null 2>&1 || fail "the Docker daemon is unavailable"
 smoke_tmp_base="$repo_dir"
 smoke_root="$(mktemp -d "$smoke_tmp_base/.zuzu-smoke.XXXXXX")"
 
+compare_snapshot() {
+    snapshot_source="$1"
+    snapshot_copy="$2"
+    snapshot_label="$3"
+
+    if [[ ! -f "$snapshot_source" ]] || ! cmp -s "$snapshot_source" "$snapshot_copy"; then
+        printf 'Smoke test failed: %s changed\n' "$snapshot_label" >&2
+        return 1
+    fi
+}
+
+verify_input_integrity() {
+    [[ -n "${snapshot_dir:-}" && -d "$snapshot_dir" ]] || return 0
+
+    integrity_status=0
+    compare_snapshot "$source_sheet" "$snapshot_dir/source_sheet.csv" "source sample sheet" || integrity_status=1
+    compare_snapshot "$source_counts" "$snapshot_dir/source_counts.csv" "source count matrix" || integrity_status=1
+    compare_snapshot "$smoke_sheet" "$snapshot_dir/smoke_sheet.csv" "collision-test sample sheet" || integrity_status=1
+    compare_snapshot "$smoke_counts" "$snapshot_dir/smoke_counts.tsv" "collision-test count matrix" || integrity_status=1
+    return "$integrity_status"
+}
+
 cleanup() {
     smoke_status=$?
     trap - EXIT
+
+    if ! verify_input_integrity; then
+        smoke_status=1
+    fi
 
     if [[ $smoke_status -eq 0 ]]; then
         printf 'Zuzu smoke test passed.\n'
@@ -60,20 +86,22 @@ output_dir="$smoke_root/output"
 log_dir="$smoke_root/logs"
 mkdir -p "$input_dir" "$launch_dir" "$work_dir" "$output_dir" "$log_dir"
 
-# These names deliberately avoid CLEANINPUTS' current fixed output basenames.
-# Once KI-001 is fixed, use those collision-prone names here as a regression check.
-smoke_sheet="$input_dir/smoke_sheet_input.csv"
-smoke_counts="$input_dir/smoke_counts_input.tsv"
+# Deliberately reproduce the input/output basename collisions from KI-001.
+# CLEANINPUTS must leave both source files byte-for-byte unchanged.
+smoke_sheet="$input_dir/samplesheet.csv"
+smoke_counts="$input_dir/countsframe_clean.csv"
 cp "$source_sheet" "$smoke_sheet"
 
 # The compact tracked fixture is CSV, while CLEANINPUTS expects tab-delimited counts.
 # This fixture has no embedded commas, so a mechanical conversion is sufficient.
 tr ',' '\t' < "$source_counts" > "$smoke_counts"
 
-source_sheet_before="$(cksum < "$source_sheet")"
-source_counts_before="$(cksum < "$source_counts")"
-smoke_sheet_before="$(cksum < "$smoke_sheet")"
-smoke_counts_before="$(cksum < "$smoke_counts")"
+snapshot_dir="$smoke_root/snapshots"
+mkdir -p "$snapshot_dir"
+cp "$source_sheet" "$snapshot_dir/source_sheet.csv"
+cp "$source_counts" "$snapshot_dir/source_counts.csv"
+cp "$smoke_sheet" "$snapshot_dir/smoke_sheet.csv"
+cp "$smoke_counts" "$snapshot_dir/smoke_counts.tsv"
 
 (
     cd "$launch_dir"
@@ -95,10 +123,7 @@ smoke_counts_before="$(cksum < "$smoke_counts")"
         -with-trace "$log_dir/trace.tsv"
 ) 2>&1 | tee "$log_dir/console.log"
 
-[[ "$(cksum < "$source_sheet")" == "$source_sheet_before" ]] || fail "source sample sheet changed"
-[[ "$(cksum < "$source_counts")" == "$source_counts_before" ]] || fail "source count matrix changed"
-[[ "$(cksum < "$smoke_sheet")" == "$smoke_sheet_before" ]] || fail "staged sample sheet changed"
-[[ "$(cksum < "$smoke_counts")" == "$smoke_counts_before" ]] || fail "staged count matrix changed"
+verify_input_integrity || fail "input integrity check failed"
 
 require_file() {
     [[ -s "$1" ]] || fail "missing or empty artifact: $1"
