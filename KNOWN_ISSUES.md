@@ -11,13 +11,7 @@ Until the critical and high-severity issues are resolved, benchmark results shou
 
 ## Critical
 
-### KI-003: Quasi-permutation sample sizes are not applied downstream
-
-The quasi-data processes use `refnum` and `altnum` to select a subset for initial high-confidence DEG discovery, but construct the quasi-permuted matrix from the full count matrix and emit the original sample sheet. Downstream analysis therefore uses all samples while the result is labelled only with `refnum`; `altnum` is discarded.
-
-Affected modules: [`deseq_data_quasi.nf`](modules/deseq_data_quasi.nf), [`edger_data_quasi.nf`](modules/edger_data_quasi.nf), and [`wilcoxon_data_quasi.nf`](modules/wilcoxon_data_quasi.nf).
-
-Impact: the quasi-permutation branch does not measure self-consistency at its reported sample sizes. Correcting this is necessary before within-method trends across sample sizes can be interpreted; KI-002 separately concerns how those results are labelled and presented.
+None currently.
 
 ## High
 
@@ -227,10 +221,6 @@ The R/e1071 SVM modules remain under `modules/`, but their includes and calls ar
 
 `synthstep` can disable the synthetic branch and `mlstep` can disable SVC, but QC, baseline, null-permutation, quasi-permutation, and aggregate plotting otherwise run together. There is no supported baseline-only mode.
 
-### KI-035: The quasi plot has an incorrect y-axis label
-
-[`QUASI_PLOTS`](modules/quasi_plots.nf) labels metric values as “Replicates per group”; sample size is actually represented by the plot facets.
-
 ### KI-036: Documentation and repository status are incomplete
 
 The README provides the scientific concept but not installation instructions, a complete parameter reference, formal input/output schemas, expected resource use, troubleshooting guidance, or interpretation cautions. Prototype scripts and generated research artifacts are not clearly distinguished from supported pipeline components.
@@ -242,3 +232,13 @@ The README provides the scientific concept but not installation instructions, a 
 Resolved 2026-08-07. [`CLEANINPUTS`](modules/cleaninputs.nf), [`CREATE_BREAKS`](modules/create_breaks.nf), and [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now stage direct user inputs under controlled names in a `staged_inputs/` subdirectory. Their fixed task outputs therefore cannot share a path with, or write through, a staged source symlink.
 
 Regression coverage deliberately uses the colliding input names `samplesheet.csv` and `countsframe_clean.csv`, verifies immutable snapshots after the run, and passed under Nextflow's symlink staging mode. An extended synthetic run also passed with inputs named `breaks.csv` and `synthcounts.csv`; the source checksums remained unchanged.
+
+### KI-003: Quasi-permutation sample sizes were not applied downstream
+
+Resolved 2026-08-10. The DESeq2, edgeR, and Wilcoxon quasi-data processes now permute and restore counts only within the selected sample subset and emit the matching subset sample sheet. Their analyzers retain the replicate and both requested group sizes, and fail if those sizes, the observed phenotype counts, the sample-sheet rows, or the count-matrix columns disagree.
+
+The smoke regression uses an intentionally unbalanced 30-reference/24-alternative fixture, exercises all three generated size pairs for all three methods, and verifies every quasi result records a consistent total. The cold end-to-end run passed.
+
+### KI-035: The quasi plot had an incorrect y-axis label
+
+Resolved 2026-08-10 alongside KI-003. [`QUASI_PLOTS`](modules/quasi_plots.nf) now labels the y-axis as a self-consistency metric and identifies each facet using both the reference- and alternative-group sample counts.
