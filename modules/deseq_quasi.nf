@@ -31,6 +31,13 @@ process DESEQ_QUASI {
   alt.num = as.integer($altnum)
   reflevel = "$params.reflevel"
 
+  # The quasi sample sheet has crossed another CSV boundary; restore its levels.
+  samplesheet\$phenotype = relevel(factor(samplesheet\$phenotype), ref = reflevel)
+  stopifnot(nlevels(samplesheet\$phenotype) == 2L,
+            identical(levels(samplesheet\$phenotype)[1], reflevel))
+  altlevel = setdiff(levels(samplesheet\$phenotype), reflevel)
+  stopifnot(length(altlevel) == 1L)
+
   observed.refnum = sum(samplesheet\$phenotype == reflevel)
   observed.altnum = sum(samplesheet\$phenotype != reflevel)
   stopifnot(observed.refnum == ref.num)
@@ -47,10 +54,12 @@ process DESEQ_QUASI {
                                 design = as.formula(~phenotype))
     # Run the default analysis for DESeq2
     dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+    deseq.results = results(dds.deg.quasi,
+                            contrast = c("phenotype", altlevel, reflevel))
 
     # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
-    quasidegs = row.names(subset(results(dds.deg.quasi),padj<0.05))
-    if(DEBUG){quasidegs = sample(row.names(results(dds.deg.quasi)),200)}
+    quasidegs = row.names(subset(deseq.results,padj<0.05))
+    if(DEBUG){quasidegs = sample(row.names(deseq.results),200)}
     #if(DEBUG){quasidegs = sample(truedegs, 70)}
     power = length(which(truedegs %in% quasidegs))/length(truedegs)
 
@@ -58,7 +67,7 @@ process DESEQ_QUASI {
     FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
 
     # 3. ROC AUC
-    allgenes = row.names(results(dds.deg.quasi))
+    allgenes = row.names(deseq.results)
     truelabels = as.numeric(allgenes %in% truedegs)
     quasilabels = as.numeric(allgenes %in% quasidegs)
     AUC = auc(truelabels, quasilabels)

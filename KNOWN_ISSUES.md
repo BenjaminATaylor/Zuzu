@@ -15,12 +15,6 @@ None currently.
 
 ## High
 
-### KI-004: The requested reference level is lost before DESeq2 and edgeR run
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) relevels `phenotype`, but CSV serialization does not preserve factor-level order. DESeq2 and edgeR read the column back and reconstruct the factor without explicitly applying `params.reflevel`, so R's default factor-level ordering, normally lexical, can determine the model coefficient.
-
-Impact: two-sided p-values and DEG membership are unchanged in the current two-group, two-sided tests, but log-fold-change signs, coefficient names, and biological direction can be reversed relative to the requested reference.
-
 ### KI-005: The null permutation destroys sample-level experimental structure
 
 [`DATA_PERMUTE`](modules/data_permute.nf) shuffles every gene independently across samples. This preserves each gene's marginal counts but destroys sample-wide library-depth and composition effects, cross-gene covariance, batch structure, and other sample-level dependencies.
@@ -238,6 +232,12 @@ Regression coverage deliberately uses the colliding input names `samplesheet.csv
 Resolved 2026-08-10. The DESeq2, edgeR, and Wilcoxon quasi-data processes now permute and restore counts only within the selected sample subset and emit the matching subset sample sheet. Their analyzers retain the replicate and both requested group sizes, and fail if those sizes, the observed phenotype counts, the sample-sheet rows, or the count-matrix columns disagree.
 
 The smoke regression uses an intentionally unbalanced 30-reference/24-alternative fixture, exercises all three generated size pairs for all three methods, and verifies every quasi result records a consistent total. The cold end-to-end run passed.
+
+### KI-004: The requested reference level was lost before DESeq2 and edgeR ran
+
+Resolved 2026-08-10. Every DESeq2 and edgeR model boundary now reconstructs the two-level phenotype factor after reading CSV, asserts that `params.reflevel` is the reference, and derives the sole alternative level. DESeq2 result extraction uses an explicit alternative-versus-reference contrast; edgeR tests an explicit numeric contrast after verifying that its phenotype coefficient encodes the same direction. The DESeq2 QC model applies the same reference-level contract.
+
+The smoke fixture now deliberately gives the requested reference a name that sorts after the alternative. Its cold non-ML run passed all basic, permutation, and quasi model assertions, and verifies that a known alternative-enriched gene has positive DESeq2 and edgeR fold changes. A separate reference-swap check confirmed that both methods reverse the effect sign while retaining the same FDR-selected gene set on the fixture.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

@@ -26,6 +26,12 @@ process QUALITYCONTROL {
   samplesheet = read.csv("$samplesheet")
   countsframe.clean = read.csv("$countsframe",row.names = 1, check.names = FALSE)
 
+  # Restore the requested model reference.
+  reflevel = "$params.reflevel"
+  samplesheet\$phenotype = relevel(factor(samplesheet\$phenotype), ref = reflevel)
+  stopifnot(nlevels(samplesheet\$phenotype) == 2L,
+            identical(levels(samplesheet\$phenotype)[1], reflevel))
+
   vst.counts = countsframe.clean %>% as.matrix() %>% varianceStabilizingTransformation()
 
   ## Heatmap of sample distances

@@ -88,11 +88,22 @@ mkdir -p "$input_dir" "$launch_dir" "$work_dir" "$output_dir" "$log_dir"
 
 # Deliberately reproduce the input/output basename collisions from KI-001.
 # The derived fixture is also unbalanced (30 reference, 24 alternative) so the
-# KI-003 regression detects accidental reuse or loss of either group size.
+# KI-003 regression detects accidental reuse or loss of either group size. Its
+# requested reference sorts after the alternative so KI-004 cannot be masked by
+# R's default lexical factor ordering.
 # CLEANINPUTS must leave both source files byte-for-byte unchanged.
 smoke_sheet="$input_dir/samplesheet.csv"
 smoke_counts="$input_dir/countsframe_clean.csv"
-head -n 55 "$source_sheet" > "$smoke_sheet"
+smoke_reflevel="z_reference"
+smoke_altlevel="a_alternative"
+awk -F',' -v reference="\"$smoke_reflevel\"" -v alternative="\"$smoke_altlevel\"" '
+    BEGIN { OFS = "," }
+    NR > 55 { exit }
+    NR == 1 { print; next }
+    $3 == "\"foo\"" { $3 = reference; print; next }
+    $3 == "\"nonref\"" { $3 = alternative; print; next }
+    { exit 2 }
+' "$source_sheet" > "$smoke_sheet" || fail "could not derive the reverse-alphabetical phenotype fixture"
 
 # The compact tracked fixture is CSV, while CLEANINPUTS expects tab-delimited counts.
 # It has no embedded commas; keep the gene column plus samples 1-54 and convert
@@ -123,7 +134,7 @@ cp "$smoke_counts" "$snapshot_dir/smoke_counts.tsv"
         -profile local \
         --samplesheet "$smoke_sheet" \
         --countsframe "$smoke_counts" \
-        --reflevel foo \
+        --reflevel "$smoke_reflevel" \
         --outdir "$output_dir" \
         --nperms "$smoke_nperms" \
         --truecutoff 0.05 \
@@ -143,6 +154,80 @@ require_file() {
 require_pdf() {
     require_file "$1"
     LC_ALL=C head -c 5 "$1" | grep -q '^%PDF-' || fail "not a valid PDF: $1"
+}
+
+csv_value() {
+    csv_file="$1"
+    wanted_row="$2"
+    wanted_column="$3"
+
+    awk -F',' -v wanted_row="$wanted_row" -v wanted_column="$wanted_column" '
+        function unquote(value) {
+            sub(/^"/, "", value)
+            sub(/"$/, "", value)
+            return value
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                if (unquote($i) == wanted_column) {
+                    value_column = i
+                }
+            }
+            if (!value_column) {
+                exit 2
+            }
+            next
+        }
+        unquote($1) == wanted_row {
+            print unquote($(value_column))
+            found_row = 1
+            exit
+        }
+        END {
+            if (!found_row) {
+                exit 3
+            }
+        }
+    ' "$csv_file"
+}
+
+verify_reference_direction() {
+    deseq_basic_table=""
+    deseq_basic_matches=0
+    while IFS= read -r dds_file; do
+        candidate_dir="${dds_file%/*}"
+        candidate_table="$candidate_dir/deseq_table.csv"
+        [[ -f "$candidate_table" ]] || continue
+        deseq_basic_table="$candidate_table"
+        ((deseq_basic_matches += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'dds_deg.RData' -print)
+
+    [[ "$deseq_basic_matches" -eq 1 ]] ||
+        fail "expected one DESeq2 basic result table, found $deseq_basic_matches"
+
+    edger_basic_table=""
+    edger_basic_matches=0
+    while IFS= read -r candidate_table; do
+        candidate_dir="${candidate_table%/*}"
+        [[ ! -e "$candidate_dir/nDEGs.RData" ]] || continue
+        edger_basic_table="$candidate_table"
+        ((edger_basic_matches += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'edger_table.csv' -print)
+
+    [[ "$edger_basic_matches" -eq 1 ]] ||
+        fail "expected one edgeR basic result table, found $edger_basic_matches"
+
+    # g2 is substantially higher in the alternative samples in this fixture.
+    # Both methods must therefore report a positive alternative-vs-reference effect.
+    deseq_effect="$(csv_value "$deseq_basic_table" "g2" "log2FoldChange")" ||
+        fail "could not read the DESeq2 g2 effect"
+    edger_effect="$(csv_value "$edger_basic_table" "g2" "logFC")" ||
+        fail "could not read the edgeR g2 effect"
+
+    awk -v effect="$deseq_effect" 'BEGIN { exit !(effect > 0) }' ||
+        fail "DESeq2 did not report g2 as higher in the alternative group: $deseq_effect"
+    awk -v effect="$edger_effect" 'BEGIN { exit !(effect > 0) }' ||
+        fail "edgeR did not report g2 as higher in the alternative group: $edger_effect"
 }
 
 verify_quasi_sample_sizes() {
@@ -271,6 +356,7 @@ fi
 [[ ! -e "$output_dir/synth_plot.pdf" ]] || fail "disabled synthetic output was published"
 [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
 require_file "$log_dir/trace.tsv"
+verify_reference_direction
 verify_quasi_trace_keys
 verify_quasi_sample_sizes
 

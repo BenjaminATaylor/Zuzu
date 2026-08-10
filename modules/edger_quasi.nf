@@ -30,6 +30,13 @@ process EDGER_QUASI {
     alt.num = as.integer($altnum)
     reflevel = "$params.reflevel"
 
+    # The quasi sample sheet has crossed another CSV boundary; restore its levels.
+    samplesheet\$phenotype = relevel(factor(samplesheet\$phenotype), ref = reflevel)
+    stopifnot(nlevels(samplesheet\$phenotype) == 2L,
+              identical(levels(samplesheet\$phenotype)[1], reflevel))
+    altlevel = setdiff(levels(samplesheet\$phenotype), reflevel)
+    stopifnot(length(altlevel) == 1L)
+
     observed.refnum = sum(samplesheet\$phenotype == reflevel)
     observed.altnum = sum(samplesheet\$phenotype != reflevel)
     stopifnot(observed.refnum == ref.num)
@@ -44,10 +51,16 @@ process EDGER_QUASI {
         #edgeR analysis using quasi-permuted data
         dds.edge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)
         dds.edge = normLibSizes(dds.edge)
-        design.edge = model.matrix(~samplesheet\$phenotype)
+        design.edge = model.matrix(~phenotype, data = samplesheet)
+        phenotype.coef = which(attr(design.edge, "assign") == 1L)
+        stopifnot(length(phenotype.coef) == 1L)
+        stopifnot(all(design.edge[samplesheet\$phenotype == reflevel, phenotype.coef] == 0),
+                  all(design.edge[samplesheet\$phenotype == altlevel, phenotype.coef] == 1))
+        edge.contrast = rep(0, ncol(design.edge))
+        edge.contrast[phenotype.coef] = 1
         dds.edge.est = estimateDisp(dds.edge,design.edge)
         edge.fit = glmQLFit(dds.edge.est,design.edge)
-        edge.qlf = glmQLFTest(edge.fit,coef=2)
+        edge.qlf = glmQLFTest(edge.fit,contrast=edge.contrast)
         edge.out.quasi = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
 
         # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
