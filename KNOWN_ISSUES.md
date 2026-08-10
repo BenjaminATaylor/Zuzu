@@ -11,19 +11,13 @@ Until the critical and high-severity issues are resolved, benchmark results shou
 
 ## Critical
 
-### KI-002: Quasi-permutation truth is circular and method-specific
-
-Each method defines its own high-confidence DEG set, restores half of those genes unchanged, and is then evaluated on its ability to rediscover them using observations that overlap the discovery data. DESeq2, edgeR, and Wilcoxon therefore receive different quasi datasets and different truth sets. The truth set also changes at every sample-size level.
-
-Impact: quasi power and FDP are selection-biased and cannot be interpreted as unbiased estimates; the bias will generally be optimistic. Sample-size points are not like-for-like, and cross-method comparisons are not valid.
-
 ### KI-003: Quasi-permutation sample sizes are not applied downstream
 
 The quasi-data processes use `refnum` and `altnum` to select a subset for initial high-confidence DEG discovery, but construct the quasi-permuted matrix from the full count matrix and emit the original sample sheet. Downstream analysis therefore uses all samples while the result is labelled only with `refnum`; `altnum` is discarded.
 
 Affected modules: [`deseq_data_quasi.nf`](modules/deseq_data_quasi.nf), [`edger_data_quasi.nf`](modules/edger_data_quasi.nf), and [`wilcoxon_data_quasi.nf`](modules/wilcoxon_data_quasi.nf).
 
-Impact: the quasi-permutation branch does not measure performance at its reported sample sizes. Correcting this issue alone will not correct the circularity in KI-002.
+Impact: the quasi-permutation branch does not measure self-consistency at its reported sample sizes. Correcting this is necessary before within-method trends across sample sizes can be interpreted; KI-002 separately concerns how those results are labelled and presented.
 
 ## High
 
@@ -94,6 +88,14 @@ SVC/RFECV identifies a subset that optimizes cross-validated classification accu
 Impact: selected genes are predictive features, not directly equivalent to FDR-controlled DESeq2, edgeR, or Wilcoxon DEGs. Comparisons and labels that treat them as the same quantity are misleading.
 
 ## Medium
+
+### KI-002: Quasi-permutation self-consistency is labelled as comparative accuracy
+
+The quasi-permutation branch deliberately derives a separate set of high-confidence anchor genes with each method, retains half of those genes unchanged, and asks the same method to recover them after the remaining genes are permuted. This is a method-specific self-consistency analysis, not a benchmark against independent biological truth. Different methods are not expected to share an anchor set or quasi-permuted dataset, and their resulting values are not direct measures of comparative accuracy.
+
+The README now states this distinction, but process outputs and plots still label the quantities as `power`, `FDP`, and `normAUC`, use `trueDEGs` for method-selected anchors, and display methods side by side. The separate mathematical problem with `normAUC` is covered by KI-007.
+
+Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
 
 ### KI-014: Only simple unpaired two-group designs are supported
 
