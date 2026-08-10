@@ -1,51 +1,132 @@
 process DATA_PERMUTE{
 
   label 'small_job'
+  tag "replicate=${x}"
 
   input: 
   tuple path(samplesheet), path(countsframe)
   val x
 
   output:
-  tuple path(samplesheet), path("countsframe_perm.csv"), emit: frames
-  val x
+  tuple val(x), path("samplesheet_perm.csv"), path(countsframe), emit: frames
+  tuple val(x), path("permutation_metadata.csv"), emit: metadata
 
   script:
   """
   #!/usr/bin/env Rscript
   library("tidyverse")
 
-  #print(paste0("DEBUG: ", "$samplesheet", " ", "$x"))
-
   samplesheet = read.csv("$samplesheet")
-  countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = FALSE)  
-  
-  # Permute colnames at random while preserving gene counts
-  set.seed($x)
-  permute_fun = function(x){
-    for(i in 1:100){ # NB if we don't get a proper permutation after 100 runs, we give up because the sample sizes are obviously inappropriate
-      # Permute and check whether any of the newly permuted rows have perfectly recaptured the original groupings
-      permrow = sample(x,replace = FALSE) 
-      newcols = samplesheet\$phenotype[match(names(permrow), samplesheet\$sample)]
-      proptrue = sum(newcols == samplesheet\$phenotype)/length(newcols)
-      # If more than 80% of sample labels have remained the same or have flipped, re-permute everything
-      if(abs(proptrue-0.5)<0.3){
-        break
-      }else if(i==100){
-        stop("Unable to achieve a balanced permutation. Are your sample sizes large enough?")
+
+  # Permutation function (NB written with some help from colleagues)
+  # In brief, how this works: we first find all possible fixed-size phenotype permutations, discard the ones that produce too large of a correlation with the original phenotype vector, and then sample uniformly from the remaining permutations
+  permute_binary_labels = function(labels, reflevel, seed){
+    labels = as.character(labels)
+    stopifnot(!anyNA(labels))
+
+    observed.levels = unique(labels)
+    stopifnot(length(observed.levels) == 2L, reflevel %in% observed.levels)
+    altlevel = setdiff(observed.levels, reflevel)
+    stopifnot(length(altlevel) == 1L)
+
+    original = as.integer(labels == altlevel)
+    sample.count = length(original)
+    alt.count = sum(original)
+    ref.count = sample.count - alt.count
+    stopifnot(alt.count > 0L, ref.count > 0L)
+
+    # Enumerate attainable overlaps between the original and permuted alternative groups
+    possible.overlaps = seq.int(max(0L, 2L * alt.count - sample.count), alt.count)
+    numerator = as.double(sample.count) * as.double(possible.overlaps) -
+                as.double(alt.count)^2
+    denominator = as.double(alt.count) * as.double(ref.count)
+    possible.correlations = numerator / denominator
+
+    # For a threshold of e.g 0.6 = 3/5, use integer-equivalent arithmetic so as not to be affected by floating-point rounding.
+    valid = 5 * abs(numerator) < 3 * denominator
+    valid.overlaps = possible.overlaps[valid]
+    if(length(valid.overlaps) == 0L){
+      stop(sprintf(
+        paste0(
+          "No fixed-size phenotype permutation satisfies |correlation| < 0.6 ",
+          "for group sizes %d and %d. Attainable correlations: %s"
+        ),
+        ref.count,
+        alt.count,
+        paste(signif(possible.correlations, 4), collapse = ", ")
+      ))
+    }
+
+    # Weight overlaps by their number of possible assignments, making the draw
+    # uniform over all label vectors that satisfy the correlation constraint.
+    log.weights = lchoose(alt.count, valid.overlaps) +
+                  lchoose(ref.count, alt.count - valid.overlaps)
+    weights = exp(log.weights - max(log.weights))
+    weights = weights / sum(weights)
+    
+    set.seed(as.integer(seed))
+    selected.overlap = valid.overlaps[
+      sample.int(length(valid.overlaps), 1L, prob = weights)
+    ]
+
+    take_positions = function(indices, size){
+      if(size == 0L){
+        integer()
+      } else {
+        indices[sample.int(length(indices), size, replace = FALSE)]
       }
     }
-    return(data.frame(t(permrow)))
+
+    new.alt.positions = c(
+      take_positions(which(original == 1L), selected.overlap),
+      take_positions(which(original == 0L), alt.count - selected.overlap)
+    )
+    permuted = integer(sample.count)
+    permuted[new.alt.positions] = 1L
+    permutation.correlation = cor(original, permuted)
+
+    stopifnot(sum(permuted) == alt.count,
+              is.finite(permutation.correlation),
+              abs(permutation.correlation) < 0.6)
+
+    list(
+      labels = ifelse(permuted == 1L, altlevel, reflevel),
+      correlation = permutation.correlation,
+      reflevel = reflevel,
+      altlevel = altlevel,
+      ref.count = ref.count,
+      alt.count = alt.count,
+      alt.overlap = selected.overlap
+    )
   }
 
-  #coerce back to df
-  countsframe.perm = apply(countsframe.clean, 1, permute_fun) %>% 
-    bind_rows(., .id = "column_label") %>%
-    column_to_rownames(var = "column_label") %>%
-    `colnames<-`(colnames(countsframe.clean))
+  permutation = permute_binary_labels(
+    samplesheet\$phenotype,
+    reflevel = "$params.reflevel",
+    seed = $x
+  )
 
-  #write.csv(samplesheet,"samplesheet_perm.csv", row.names = FALSE)
-  write.csv(countsframe.perm,"countsframe_perm.csv")
+  samplesheet.perm = samplesheet
+  samplesheet.perm\$phenotype = permutation\$labels
+  non.phenotype.columns = setdiff(colnames(samplesheet), "phenotype")
+  stopifnot(identical(samplesheet.perm[,non.phenotype.columns,drop=FALSE],
+                      samplesheet[,non.phenotype.columns,drop=FALSE]))
+  stopifnot(identical(table(samplesheet.perm\$phenotype),
+                      table(as.character(samplesheet\$phenotype))))
+
+  permutation.metadata = data.frame(
+    replicate = as.integer($x),
+    correlation = permutation\$correlation,
+    max_abs_correlation = 0.6,
+    reference = permutation\$reflevel,
+    alternative = permutation\$altlevel,
+    reference_count = permutation\$ref.count,
+    alternative_count = permutation\$alt.count,
+    alternative_overlap = permutation\$alt.overlap
+  )
+
+  write.csv(samplesheet.perm, "samplesheet_perm.csv", row.names = FALSE)
+  write.csv(permutation.metadata, "permutation_metadata.csv", row.names = FALSE)
 
   """
 }

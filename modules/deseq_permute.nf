@@ -1,9 +1,10 @@
 process DESEQ_PERMUTE{
   
   label 'mid_job'
+  tag "replicate=${x}"
 
   input: 
-  tuple path(samplesheet), path(countsframe) 
+  tuple val(x), path(samplesheet), path(countsframe)
 
   output:
   path "deseq_table.csv", emit: outfile

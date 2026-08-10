@@ -15,12 +15,6 @@ None currently.
 
 ## High
 
-### KI-005: The null permutation destroys sample-level experimental structure
-
-[`DATA_PERMUTE`](modules/data_permute.nf) shuffles every gene independently across samples. This preserves each gene's marginal counts but destroys sample-wide library-depth and composition effects, cross-gene covariance, batch structure, and other sample-level dependencies.
-
-Impact: the branch measures behaviour under a destructive gene-wise synthetic null, not false-positive calibration under the structure of the original experiment. Its discovery counts do not estimate the fraction of baseline calls that are false. Whole-sample phenotype-label permutation would preserve sample-level structure and answer calibration conditional on the observed sample profiles.
-
 ### KI-006: The common gene filter is phenotype-aware and raw-depth-dependent
 
 [`CLEANINPUTS`](modules/cleaninputs.nf) retains a gene when the maximum of its two raw phenotype-group means exceeds five. This specific rule is contrast-dependent and ignores library size.
@@ -42,12 +36,6 @@ The quasi and synthetic analyzers calculate FDP as `1 - TP / calls`. When a meth
 If the simulated truth set is empty, power also divides by zero and ROC has only one response class. This can occur with an invalid zero DEG proportion or if simulator filtering removes all simulated DE genes, and may abort analysis rather than merely produce a missing summary.
 
 Impact: valid empty-set outcomes can corrupt summaries or fail tasks. Counts of TP, FP, TN, FN, tested genes, called genes, and truth genes should be retained; zero-call and zero-truth conventions should be defined explicitly.
-
-### KI-009: The null-permutation acceptance rule assumes approximately balanced groups
-
-[`DATA_PERMUTE`](modules/data_permute.nf) accepts only gene-wise permutations whose agreement with the original labels is strictly between 20% and 80%. For sufficiently unbalanced designs this criterion is impossible; for example, a 90:10 design cannot have less than 80% agreement. Less extreme imbalance still conditions the generated null in a group-size-dependent way.
-
-Impact: the process can fail after 100 attempts or generate a biased subset of permutations for unbalanced experiments.
 
 ### KI-010: Quasi results are censored when too few retained genes are available
 
@@ -238,6 +226,18 @@ The smoke regression uses an intentionally unbalanced 30-reference/24-alternativ
 Resolved 2026-08-10. Every DESeq2 and edgeR model boundary now reconstructs the two-level phenotype factor after reading CSV, asserts that `params.reflevel` is the reference, and derives the sole alternative level. DESeq2 result extraction uses an explicit alternative-versus-reference contrast; edgeR tests an explicit numeric contrast after verifying that its phenotype coefficient encodes the same direction. The DESeq2 QC model applies the same reference-level contract.
 
 The smoke fixture now deliberately gives the requested reference a name that sorts after the alternative. Its cold non-ML run passed all basic, permutation, and quasi model assertions, and verifies that a known alternative-enriched gene has positive DESeq2 and edgeR fold changes. A separate reference-swap check confirmed that both methods reverse the effect sign while retaining the same FDR-selected gene set on the fixture.
+
+### KI-005: The null permutation destroyed sample-level experimental structure
+
+Resolved 2026-08-10. [`DATA_PERMUTE`](modules/data_permute.nf) now leaves the cleaned count matrix unchanged and permutes the phenotype labels once per replicate while preserving both group sizes. The resulting keyed label assignment is shared by DESeq2, edgeR, Wilcoxon, and SVC, so every method sees the same negative-control dataset. Each replicate records its seed, labels, group sizes, overlap, and label correlation in `permutation_metadata.csv`.
+
+Assignments are sampled directly and uniformly from the fixed-margin label vectors whose absolute correlation with the original labels is strictly less than 0.6. This preserves the rule against nearly reproducing the original grouping or its reversal without a retry loop. It also handles unbalanced groups, resolving KI-009, and fails immediately with a clear message for the infeasible two-sample 1:1 case. This remains a constrained diagnostic under phenotype-label exchangeability, not unrestricted classical permutation inference, and its discovery counts do not estimate the fraction of baseline calls that are false.
+
+The smoke regression verifies that the forwarded count matrix is byte-identical to the cleaned input, group sizes and sample order are preserved, every label correlation satisfies the constraint, no replacement count matrix is created, and all non-ML methods consume each replicate exactly once.
+
+### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
+
+Resolved 2026-08-10 alongside KI-005. The raw 20--80% agreement rule and its 100-attempt retry loop were replaced by exact enumeration of the correlations attainable at the observed binary group sizes. The process draws directly from all valid fixed-margin assignments, so heavily unbalanced designs no longer fail merely because their unavoidable raw agreement is high.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

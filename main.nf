@@ -106,7 +106,7 @@ workflow {
   WILCOXON_PERMUTE(DATA_PERMUTE.out.frames)
   if (params.mlstep) {
     // For SVC
-    SVC_PERMUTE(DATA_PERMUTE.out)
+    SVC_PERMUTE(DATA_PERMUTE.out.frames)
   }
   // Combine outputs and plot
   PERMUTE_PLOTS(

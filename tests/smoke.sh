@@ -8,6 +8,7 @@ source_sheet="$repo_dir/input/synthtest/synthsheet.csv"
 source_counts="$repo_dir/input/synthtest/synthcounts.csv"
 plot_dir="$script_dir/.smoke-plots"
 smoke_nperms="${SMOKE_NPERMS:-1}"
+smoke_max_permute_correlation="0.6"
 
 fail() {
     printf 'Smoke test failed: %s\n' "$1" >&2
@@ -230,6 +231,235 @@ verify_reference_direction() {
         fail "edgeR did not report g2 as higher in the alternative group: $edger_effect"
 }
 
+permutation_sheet_stats() {
+    original_sheet="$1"
+    permuted_sheet="$2"
+
+    awk -F',' -v expected_ref="$smoke_reflevel" -v expected_alt="$smoke_altlevel" '
+        function unquote(value) {
+            sub(/^"/, "", value)
+            sub(/"$/, "", value)
+            return value
+        }
+        function abort_with(code) {
+            failure = code
+            exit code
+        }
+        FNR == 1 {
+            file_number += 1
+            for (i = 1; i <= NF; i++) {
+                heading = unquote($i)
+                if (heading == "sample") {
+                    sample_column[file_number] = i
+                } else if (heading == "phenotype") {
+                    phenotype_column[file_number] = i
+                }
+            }
+            if (!sample_column[file_number] || !phenotype_column[file_number]) {
+                abort_with(2)
+            }
+            next
+        }
+        file_number == 1 {
+            sample = unquote($(sample_column[file_number]))
+            phenotype = unquote($(phenotype_column[file_number]))
+            if (sample in original_phenotype) {
+                abort_with(3)
+            }
+            if (phenotype != expected_ref && phenotype != expected_alt) {
+                abort_with(4)
+            }
+            original_rows += 1
+            original_order[original_rows] = sample
+            original_phenotype[sample] = phenotype
+            original_ref += (phenotype == expected_ref)
+            original_alt += (phenotype == expected_alt)
+            next
+        }
+        file_number == 2 {
+            sample = unquote($(sample_column[file_number]))
+            phenotype = unquote($(phenotype_column[file_number]))
+            if (!(sample in original_phenotype) || sample in seen_permuted) {
+                abort_with(5)
+            }
+            permuted_rows += 1
+            if (sample != original_order[permuted_rows]) {
+                abort_with(6)
+            }
+            if (phenotype != expected_ref && phenotype != expected_alt) {
+                abort_with(7)
+            }
+            seen_permuted[sample] = 1
+            permuted_ref += (phenotype == expected_ref)
+            permuted_alt += (phenotype == expected_alt)
+            both_alt += (original_phenotype[sample] == expected_alt && phenotype == expected_alt)
+            next
+        }
+        END {
+            if (failure) {
+                exit failure
+            }
+            if (file_number != 2 || original_rows != permuted_rows) {
+                exit 8
+            }
+            if (original_ref != permuted_ref || original_alt != permuted_alt) {
+                exit 9
+            }
+            denominator = sqrt(original_alt * original_ref * permuted_alt * permuted_ref)
+            if (denominator == 0) {
+                exit 10
+            }
+            correlation = (original_rows * both_alt - original_alt * permuted_alt) / denominator
+            printf "%.12g %d %d\n", correlation, permuted_ref, permuted_alt
+        }
+    ' "$original_sheet" "$permuted_sheet"
+}
+
+verify_null_permutations() {
+    clean_counts=""
+    clean_counts_matches=0
+    while IFS= read -r candidate_counts; do
+        clean_counts="$candidate_counts"
+        ((clean_counts_matches += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'countsframe_clean.csv' -print)
+
+    [[ "$clean_counts_matches" -eq 1 ]] ||
+        fail "expected one cleaned count matrix, found $clean_counts_matches"
+    clean_task_dir="${clean_counts%/*}"
+    clean_sheet="$clean_task_dir/samplesheet.csv"
+    require_file "$clean_sheet"
+
+    unexpected_permuted_counts="$(find "$work_dir" -name 'countsframe_perm.csv' -print -quit)"
+    [[ -z "$unexpected_permuted_counts" ]] ||
+        fail "null permutation created a replacement count matrix: $unexpected_permuted_counts"
+
+    permutation_count=0
+    permutation_replicate_counts=()
+    while IFS= read -r metadata_file; do
+        task_dir="${metadata_file%/*}"
+        permuted_sheet="$task_dir/samplesheet_perm.csv"
+        forwarded_counts="$task_dir/countsframe_clean.csv"
+        require_file "$permuted_sheet"
+        require_file "$forwarded_counts"
+        cmp -s "$clean_counts" "$forwarded_counts" ||
+            fail "null permutation changed the cleaned count matrix: $forwarded_counts"
+
+        sheet_stats="$(permutation_sheet_stats "$clean_sheet" "$permuted_sheet")" ||
+            fail "invalid null-permutation sample sheet: $permuted_sheet"
+        read -r observed_correlation observed_ref_count observed_alt_count <<< "$sheet_stats"
+        [[ "$observed_ref_count:$observed_alt_count" == "30:24" ]] ||
+            fail "null permutation changed phenotype counts: $observed_ref_count ref, $observed_alt_count alt"
+        awk -v value="$observed_correlation" -v maximum="$smoke_max_permute_correlation" '
+            BEGIN { exit !(value < maximum && value > -maximum) }
+        ' || fail "null permutation correlation exceeds the constraint: $observed_correlation"
+
+        metadata_values="$(awk -F',' '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    gsub(/^"|"$/, "", $i)
+                    column[$i] = i
+                }
+                required[1] = "replicate"
+                required[2] = "correlation"
+                required[3] = "max_abs_correlation"
+                required[4] = "reference"
+                required[5] = "alternative"
+                required[6] = "reference_count"
+                required[7] = "alternative_count"
+                required[8] = "alternative_overlap"
+                for (i = 1; i <= 8; i++) {
+                    if (!(required[i] in column)) {
+                        exit 2
+                    }
+                }
+                next
+            }
+            NR == 2 {
+                for (i = 1; i <= NF; i++) {
+                    gsub(/^"|"$/, "", $i)
+                }
+                printf "%s %s %s %s %s %s %s %s\n",
+                       $(column["replicate"]),
+                       $(column["correlation"]),
+                       $(column["max_abs_correlation"]),
+                       $(column["reference"]),
+                       $(column["alternative"]),
+                       $(column["reference_count"]),
+                       $(column["alternative_count"]),
+                       $(column["alternative_overlap"])
+                next
+            }
+            END {
+                if (NR != 2) {
+                    exit 3
+                }
+            }
+        ' "$metadata_file")" || fail "invalid permutation metadata: $metadata_file"
+
+        read -r replicate_id metadata_correlation metadata_maximum metadata_ref metadata_alt \
+            metadata_ref_count metadata_alt_count metadata_overlap <<< "$metadata_values"
+        [[ "$replicate_id" =~ ^[1-9][0-9]*$ ]] || fail "invalid permutation replicate: $replicate_id"
+        [[ "$metadata_maximum" == "$smoke_max_permute_correlation" ]] ||
+            fail "unexpected permutation correlation limit: $metadata_maximum"
+        [[ "$metadata_ref:$metadata_alt" == "$smoke_reflevel:$smoke_altlevel" ]] ||
+            fail "unexpected permutation phenotype labels: $metadata_ref, $metadata_alt"
+        [[ "$metadata_ref_count:$metadata_alt_count" == "30:24" ]] ||
+            fail "invalid permutation metadata counts: $metadata_ref_count ref, $metadata_alt_count alt"
+        [[ "$metadata_overlap" =~ ^[0-9]+$ ]] || fail "invalid alternative overlap: $metadata_overlap"
+        awk -v observed="$observed_correlation" -v recorded="$metadata_correlation" '
+            BEGIN {
+                difference = observed - recorded
+                if (difference < 0) difference = -difference
+                exit !(difference < 1e-10)
+            }
+        ' || fail "permutation metadata correlation does not match its sample sheet"
+
+        permutation_replicate_counts[$replicate_id]=$((
+            ${permutation_replicate_counts[$replicate_id]:-0} + 1
+        ))
+        ((permutation_count += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'permutation_metadata.csv' -print | sort)
+
+    [[ "$permutation_count" -eq "$smoke_nperms" ]] ||
+        fail "expected $smoke_nperms null permutations, found $permutation_count"
+    for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
+        [[ "${permutation_replicate_counts[$replicate_id]:-0}" -eq 1 ]] ||
+            fail "expected one null permutation for replicate $replicate_id"
+    done
+}
+
+verify_permutation_trace_keys() {
+    for process_name in DATA_PERMUTE DESEQ_PERMUTE EDGER_PERMUTE WILCOXON_PERMUTE; do
+        for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
+            expected_tag="$process_name (replicate=$replicate_id)"
+            trace_matches="$(awk -F '\t' -v expected="$expected_tag" '
+                NR == 1 {
+                    for (i = 1; i <= NF; i++) {
+                        if ($i == "name") {
+                            name_column = i
+                        } else if ($i == "status") {
+                            status_column = i
+                        }
+                    }
+                    if (!name_column || !status_column) {
+                        exit 2
+                    }
+                    next
+                }
+                index($(name_column), expected) && $(status_column) == "COMPLETED" {
+                    matches += 1
+                }
+                END {
+                    print matches + 0
+                }
+            ' "$log_dir/trace.tsv")" || fail "could not parse permutation task keys from the trace"
+
+            [[ "$trace_matches" -eq 1 ]] ||
+                fail "expected one completed task for $expected_tag, found $trace_matches"
+        done
+    done
+}
+
 verify_quasi_sample_sizes() {
     expected_result_count=$((smoke_nperms * 3 * 3))
     expected_pair_count=$((smoke_nperms * 3))
@@ -357,6 +587,8 @@ fi
 [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
 require_file "$log_dir/trace.tsv"
 verify_reference_direction
+verify_null_permutations
+verify_permutation_trace_keys
 verify_quasi_trace_keys
 verify_quasi_sample_sizes
 

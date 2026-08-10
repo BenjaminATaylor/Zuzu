@@ -1,7 +1,9 @@
 process EDGER_PERMUTE{
 
+  tag "replicate=${x}"
+
   input: 
-  tuple path(samplesheet), path(countsframe) 
+  tuple val(x), path(samplesheet), path(countsframe)
 
   output:
   path "edger_table.csv", emit: outfile
