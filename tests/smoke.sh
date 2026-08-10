@@ -108,11 +108,37 @@ awk -F',' -v reference="\"$smoke_reflevel\"" -v alternative="\"$smoke_altlevel\"
 
 # The compact tracked fixture is CSV, while CLEANINPUTS expects tab-delimited counts.
 # It has no embedded commas; keep the gene column plus samples 1-54 and convert
-# the result mechanically to tab-delimited input.
+# the result mechanically to tab-delimited input. Add four sentinel genes that
+# distinguish the CPM/prevalence rule from the old raw group-mean filter.
 awk -F',' 'BEGIN { OFS = "\t" }
     {
         for (i = 1; i <= 55; i++) {
             printf "%s%s", $i, (i == 55 ? ORS : OFS)
+        }
+    }
+    END {
+        printf "smoke_filter_below_cpm"
+        for (i = 2; i <= 55; i++) printf "%s6", OFS
+        printf "%s", ORS
+
+        printf "smoke_filter_prevalent"
+        for (i = 2; i <= 55; i++) printf "%s20", OFS
+        printf "%s", ORS
+
+        printf "smoke_filter_group_specific"
+        for (i = 2; i <= 55; i++) printf "%s%d", OFS, (i >= 32 ? 20 : 0)
+        printf "%s", ORS
+
+        printf "smoke_filter_sparse"
+        for (i = 2; i <= 55; i++) printf "%s%d", OFS, (i <= 24 ? 1000 : 0)
+        printf "%s", ORS
+
+        # These rows are discarded before analysis and make the high-filtering
+        # warning deterministic even if every tracked fixture gene is retained.
+        for (sentinel = 1; sentinel <= 1001; sentinel++) {
+            printf "smoke_filter_bulk_low_%04d", sentinel
+            for (i = 2; i <= 55; i++) printf "%s0", OFS
+            printf "%s", ORS
         }
     }
 ' "$source_counts" > "$smoke_counts"
@@ -190,6 +216,53 @@ csv_value() {
             }
         }
     ' "$csv_file"
+}
+
+locate_clean_outputs() {
+    clean_counts=""
+    clean_counts_matches=0
+    while IFS= read -r candidate_counts; do
+        clean_counts="$candidate_counts"
+        ((clean_counts_matches += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'countsframe_clean.csv' -print)
+
+    [[ "$clean_counts_matches" -eq 1 ]] ||
+        fail "expected one cleaned count matrix, found $clean_counts_matches"
+    clean_task_dir="${clean_counts%/*}"
+    clean_sheet="$clean_task_dir/samplesheet.csv"
+    require_file "$clean_counts"
+    require_file "$clean_sheet"
+}
+
+verify_common_filter() {
+    prevalent_sample1="$(csv_value "$clean_counts" "smoke_filter_prevalent" "sample1")" ||
+        fail "the prevalent filtering sentinel was removed"
+    prevalent_sample54="$(csv_value "$clean_counts" "smoke_filter_prevalent" "sample54")" ||
+        fail "the prevalent filtering sentinel was removed"
+    [[ "$prevalent_sample1:$prevalent_sample54" == "20:20" ]] ||
+        fail "filtering changed counts for the prevalent sentinel"
+
+    group_specific_sample1="$(csv_value "$clean_counts" "smoke_filter_group_specific" "sample1")" ||
+        fail "the group-specific filtering sentinel was removed"
+    group_specific_sample31="$(csv_value "$clean_counts" "smoke_filter_group_specific" "sample31")" ||
+        fail "the group-specific filtering sentinel was removed"
+    [[ "$group_specific_sample1:$group_specific_sample31" == "0:20" ]] ||
+        fail "filtering changed counts for the group-specific sentinel"
+
+    if csv_value "$clean_counts" "smoke_filter_below_cpm" "sample1" >/dev/null 2>&1; then
+        fail "the below-CPM filtering sentinel was retained"
+    fi
+    if csv_value "$clean_counts" "smoke_filter_sparse" "sample1" >/dev/null 2>&1; then
+        fail "the low-prevalence filtering sentinel was retained"
+    fi
+}
+
+verify_filter_warning() {
+    warning_prefix="WARNING [CLEANINPUTS]: the common CPM/prevalence filter removed"
+    grep -Fq "$warning_prefix" "$log_dir/console.log" ||
+        fail "the high-filtering warning was not reported in the console"
+    grep -Fq "exceeding the 50% warning threshold" "$log_dir/console.log" ||
+        fail "the high-filtering warning did not report its threshold"
 }
 
 verify_reference_direction() {
@@ -316,19 +389,6 @@ permutation_sheet_stats() {
 }
 
 verify_null_permutations() {
-    clean_counts=""
-    clean_counts_matches=0
-    while IFS= read -r candidate_counts; do
-        clean_counts="$candidate_counts"
-        ((clean_counts_matches += 1))
-    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'countsframe_clean.csv' -print)
-
-    [[ "$clean_counts_matches" -eq 1 ]] ||
-        fail "expected one cleaned count matrix, found $clean_counts_matches"
-    clean_task_dir="${clean_counts%/*}"
-    clean_sheet="$clean_task_dir/samplesheet.csv"
-    require_file "$clean_sheet"
-
     unexpected_permuted_counts="$(find "$work_dir" -name 'countsframe_perm.csv' -print -quit)"
     [[ -z "$unexpected_permuted_counts" ]] ||
         fail "null permutation created a replacement count matrix: $unexpected_permuted_counts"
@@ -586,6 +646,9 @@ fi
 [[ ! -e "$output_dir/synth_plot.pdf" ]] || fail "disabled synthetic output was published"
 [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
 require_file "$log_dir/trace.tsv"
+verify_filter_warning
+locate_clean_outputs
+verify_common_filter
 verify_reference_direction
 verify_null_permutations
 verify_permutation_trace_keys

@@ -15,12 +15,6 @@ None currently.
 
 ## High
 
-### KI-006: The common gene filter is phenotype-aware and raw-depth-dependent
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) retains a gene when the maximum of its two raw phenotype-group means exceeds five. This specific rule is contrast-dependent and ignores library size.
-
-Impact: sequencing-depth differences and chance group imbalances can affect which hypotheses enter testing. A label-blind CPM/prevalence rule, or a clearly documented purpose-built design-aware rule such as edgeR's `filterByExpr`, would provide a more defensible testing universe.
-
 ### KI-007: Reported ROC AUC is calculated from binary DEG calls
 
 The quasi and full-synthetic analyzers pass binary selected/not-selected calls to the ROC calculation instead of a continuous statistic or score. With a binary predictor, the resulting AUC is equivalent to balanced accuracy at one threshold, potentially after pROC automatically reverses the score direction. `normAUC = 2 * AUC - 1` is the corresponding single-threshold Youden index rather than an area over a multi-threshold ROC curve.
@@ -234,6 +228,12 @@ Resolved 2026-08-10. [`DATA_PERMUTE`](modules/data_permute.nf) now leaves the cl
 Assignments are sampled directly and uniformly from the fixed-margin label vectors whose absolute correlation with the original labels is strictly less than 0.6. This preserves the rule against nearly reproducing the original grouping or its reversal without a retry loop. It also handles unbalanced groups, resolving KI-009, and fails immediately with a clear message for the infeasible two-sample 1:1 case. This remains a constrained diagnostic under phenotype-label exchangeability, not unrestricted classical permutation inference, and its discovery counts do not estimate the fraction of baseline calls that are false.
 
 The smoke regression verifies that the forwarded count matrix is byte-identical to the cleaned input, group sizes and sample order are preserved, every label correlation satisfies the constraint, no replacement count matrix is created, and all non-ML methods consume each replicate exactly once.
+
+### KI-006: The common gene filter was phenotype-aware and raw-depth-dependent
+
+Resolved 2026-08-10. [`CLEANINPUTS`](modules/cleaninputs.nf) now calculates counts per million from each sample's rounded, unfiltered library total and retains genes with at least 1 CPM in at least as many samples as the smaller phenotype group. Group size determines the required prevalence, but group membership is not used in any gene's filtering decision. The retained count values are not transformed, and the same filtered matrix is shared by QC and every baseline, null-permutation, and quasi-permutation method. If more than half of the input genes are removed, the process reports the counts and percentage in a visible warning while continuing with the retained genes. The full-synthetic branch remains separate under KI-016.
+
+The smoke fixture includes sentinel genes confirming that below-CPM and insufficiently prevalent genes are removed, sufficiently prevalent genes are retained, expression confined to one complete phenotype group is not discarded, retained counts remain unchanged, and a greater-than-50% removal warning reaches the console. A separate fixed-margin relabelling check confirmed that phenotype assignments do not alter the retained gene set.
 
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 
