@@ -2,10 +2,10 @@ process SVC_PERMUTE{
 
     publishDir "$params.outdir/svctables", pattern: '*.png'
     label 'big_job'
+    tag "replicate=${x}"
 
     input: 
-    tuple path(samplesheet), path(countsframe) 
-    val x
+    tuple val(x), path(samplesheet), path(countsframe)
 
     output:
     path "svc_table.csv", emit: outfile

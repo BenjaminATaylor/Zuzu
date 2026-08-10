@@ -22,20 +22,26 @@ process QUASI_PLOTS{
       bind_rows() %>%
       mutate_all(as.numeric) %>%
       mutate(method = label) %>%
-      melt(id.vars = c("method", "samplenum"))
+      melt(
+        id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),
+        measure.vars = c("power", "FDP", "normAUC")
+      )
   }
 
   gg.quasi.input = rbind(
     read_quasis("deseq",  "DESeq2"),
     read_quasis("edger",  "edgeR"),
     read_quasis("wilcox", "Wilcoxon")
-  )
+  ) %>%
+    mutate(sample_size = paste0(refnum, " ref + ", altnum, " alt")) %>%
+    arrange(totalnum, refnum, altnum) %>%
+    mutate(sample_size = factor(sample_size, levels = unique(sample_size)))
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
     scale_y_continuous(limits = c(0,1)) +
-    labs(x = "Method", y = "Replicates per group") +
-    facet_grid(samplenum~variable) +
+    labs(x = "Method", y = "Self-consistency metric") +
+    facet_grid(sample_size~variable) +
     theme_bw() +
     theme(strip.background = element_blank())
 

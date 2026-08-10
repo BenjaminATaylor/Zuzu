@@ -1,6 +1,6 @@
 # Known issues
 
-Zuzu is an in-development research pipeline. The issues below apply to the current `dev` implementation and are grouped from highest to lowest severity.
+Zuzu is an in-development research pipeline. Active issues below apply to the current `dev` implementation and are grouped from highest to lowest severity. Resolved issues are retained at the end for traceability.
 
 - **Critical:** can corrupt source data or invalidate a central benchmark.
 - **High:** can produce materially incorrect or misleading scientific results.
@@ -11,41 +11,9 @@ Until the critical and high-severity issues are resolved, benchmark results shou
 
 ## Critical
 
-### KI-001: Input cleaning can overwrite source files
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) stages inputs under their original basenames, but writes fixed outputs named `samplesheet.csv` and `countsframe_clean.csv`. Under Nextflow's current/default symlink staging mode, if an input already has either output name, R writes through the staged symlink and modifies the source file. The common input name `samplesheet.csv` has already triggered this behaviour in an existing work directory.
-
-[`CREATE_BREAKS`](modules/create_breaks.nf) also reads the original sample sheet concurrently, so a collision creates a read/write race in addition to source-data corruption.
-
-Impact: user input and provenance can be silently altered, and different tasks may observe different file contents during the same run.
-
-### KI-002: Quasi-permutation truth is circular and method-specific
-
-Each method defines its own high-confidence DEG set, restores half of those genes unchanged, and is then evaluated on its ability to rediscover them using observations that overlap the discovery data. DESeq2, edgeR, and Wilcoxon therefore receive different quasi datasets and different truth sets. The truth set also changes at every sample-size level.
-
-Impact: quasi power and FDP are selection-biased and cannot be interpreted as unbiased estimates; the bias will generally be optimistic. Sample-size points are not like-for-like, and cross-method comparisons are not valid.
-
-### KI-003: Quasi-permutation sample sizes are not applied downstream
-
-The quasi-data processes use `refnum` and `altnum` to select a subset for initial high-confidence DEG discovery, but construct the quasi-permuted matrix from the full count matrix and emit the original sample sheet. Downstream analysis therefore uses all samples while the result is labelled only with `refnum`; `altnum` is discarded.
-
-Affected modules: [`deseq_data_quasi.nf`](modules/deseq_data_quasi.nf), [`edger_data_quasi.nf`](modules/edger_data_quasi.nf), and [`wilcoxon_data_quasi.nf`](modules/wilcoxon_data_quasi.nf).
-
-Impact: the quasi-permutation branch does not measure performance at its reported sample sizes. Correcting this issue alone will not correct the circularity in KI-002.
+None currently.
 
 ## High
-
-### KI-004: The requested reference level is lost before DESeq2 and edgeR run
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) relevels `phenotype`, but CSV serialization does not preserve factor-level order. DESeq2 and edgeR read the column back and reconstruct the factor without explicitly applying `params.reflevel`, so R's default factor-level ordering, normally lexical, can determine the model coefficient.
-
-Impact: two-sided p-values and DEG membership are unchanged in the current two-group, two-sided tests, but log-fold-change signs, coefficient names, and biological direction can be reversed relative to the requested reference.
-
-### KI-005: The null permutation destroys sample-level experimental structure
-
-[`DATA_PERMUTE`](modules/data_permute.nf) shuffles every gene independently across samples. This preserves each gene's marginal counts but destroys sample-wide library-depth and composition effects, cross-gene covariance, batch structure, and other sample-level dependencies.
-
-Impact: the branch measures behaviour under a destructive gene-wise synthetic null, not false-positive calibration under the structure of the original experiment. Its discovery counts do not estimate the fraction of baseline calls that are false. Whole-sample phenotype-label permutation would preserve sample-level structure and answer calibration conditional on the observed sample profiles.
 
 ### KI-006: The common gene filter is phenotype-aware and raw-depth-dependent
 
@@ -68,12 +36,6 @@ The quasi and synthetic analyzers calculate FDP as `1 - TP / calls`. When a meth
 If the simulated truth set is empty, power also divides by zero and ROC has only one response class. This can occur with an invalid zero DEG proportion or if simulator filtering removes all simulated DE genes, and may abort analysis rather than merely produce a missing summary.
 
 Impact: valid empty-set outcomes can corrupt summaries or fail tasks. Counts of TP, FP, TN, FN, tested genes, called genes, and truth genes should be retained; zero-call and zero-truth conventions should be defined explicitly.
-
-### KI-009: The null-permutation acceptance rule assumes approximately balanced groups
-
-[`DATA_PERMUTE`](modules/data_permute.nf) accepts only gene-wise permutations whose agreement with the original labels is strictly between 20% and 80%. For sufficiently unbalanced designs this criterion is impossible; for example, a 90:10 design cannot have less than 80% agreement. Less extreme imbalance still conditions the generated null in a group-size-dependent way.
-
-Impact: the process can fail after 100 attempts or generate a biased subset of permutations for unbalanced experiments.
 
 ### KI-010: Quasi results are censored when too few retained genes are available
 
@@ -102,6 +64,14 @@ SVC/RFECV identifies a subset that optimizes cross-validated classification accu
 Impact: selected genes are predictive features, not directly equivalent to FDR-controlled DESeq2, edgeR, or Wilcoxon DEGs. Comparisons and labels that treat them as the same quantity are misleading.
 
 ## Medium
+
+### KI-002: Quasi-permutation self-consistency is labelled as comparative accuracy
+
+The quasi-permutation branch deliberately derives a separate set of high-confidence anchor genes with each method, retains half of those genes unchanged, and asks the same method to recover them after the remaining genes are permuted. This is a method-specific self-consistency analysis, not a benchmark against independent biological truth. Different methods are not expected to share an anchor set or quasi-permuted dataset, and their resulting values are not direct measures of comparative accuracy.
+
+The README now states this distinction, but process outputs and plots still label the quantities as `power`, `FDP`, and `normAUC`, use `trueDEGs` for method-selected anchors, and display methods side by side. The separate mathematical problem with `normAUC` is covered by KI-007.
+
+Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
 
 ### KI-014: Only simple unpaired two-group designs are supported
 
@@ -233,10 +203,42 @@ The R/e1071 SVM modules remain under `modules/`, but their includes and calls ar
 
 `synthstep` can disable the synthetic branch and `mlstep` can disable SVC, but QC, baseline, null-permutation, quasi-permutation, and aggregate plotting otherwise run together. There is no supported baseline-only mode.
 
-### KI-035: The quasi plot has an incorrect y-axis label
-
-[`QUASI_PLOTS`](modules/quasi_plots.nf) labels metric values as “Replicates per group”; sample size is actually represented by the plot facets.
-
 ### KI-036: Documentation and repository status are incomplete
 
 The README provides the scientific concept but not installation instructions, a complete parameter reference, formal input/output schemas, expected resource use, troubleshooting guidance, or interpretation cautions. Prototype scripts and generated research artifacts are not clearly distinguished from supported pipeline components.
+
+## Resolved
+
+### KI-001: Input staging could overwrite source files
+
+Resolved 2026-08-07. [`CLEANINPUTS`](modules/cleaninputs.nf), [`CREATE_BREAKS`](modules/create_breaks.nf), and [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now stage direct user inputs under controlled names in a `staged_inputs/` subdirectory. Their fixed task outputs therefore cannot share a path with, or write through, a staged source symlink.
+
+Regression coverage deliberately uses the colliding input names `samplesheet.csv` and `countsframe_clean.csv`, verifies immutable snapshots after the run, and passed under Nextflow's symlink staging mode. An extended synthetic run also passed with inputs named `breaks.csv` and `synthcounts.csv`; the source checksums remained unchanged.
+
+### KI-003: Quasi-permutation sample sizes were not applied downstream
+
+Resolved 2026-08-10. The DESeq2, edgeR, and Wilcoxon quasi-data processes now permute and restore counts only within the selected sample subset and emit the matching subset sample sheet. Their analyzers retain the replicate and both requested group sizes, and fail if those sizes, the observed phenotype counts, the sample-sheet rows, or the count-matrix columns disagree.
+
+The smoke regression uses an intentionally unbalanced 30-reference/24-alternative fixture, exercises all three generated size pairs for all three methods, and verifies every quasi result records a consistent total. The cold end-to-end run passed.
+
+### KI-004: The requested reference level was lost before DESeq2 and edgeR ran
+
+Resolved 2026-08-10. Every DESeq2 and edgeR model boundary now reconstructs the two-level phenotype factor after reading CSV, asserts that `params.reflevel` is the reference, and derives the sole alternative level. DESeq2 result extraction uses an explicit alternative-versus-reference contrast; edgeR tests an explicit numeric contrast after verifying that its phenotype coefficient encodes the same direction. The DESeq2 QC model applies the same reference-level contract.
+
+The smoke fixture now deliberately gives the requested reference a name that sorts after the alternative. Its cold non-ML run passed all basic, permutation, and quasi model assertions, and verifies that a known alternative-enriched gene has positive DESeq2 and edgeR fold changes. A separate reference-swap check confirmed that both methods reverse the effect sign while retaining the same FDR-selected gene set on the fixture.
+
+### KI-005: The null permutation destroyed sample-level experimental structure
+
+Resolved 2026-08-10. [`DATA_PERMUTE`](modules/data_permute.nf) now leaves the cleaned count matrix unchanged and permutes the phenotype labels once per replicate while preserving both group sizes. The resulting keyed label assignment is shared by DESeq2, edgeR, Wilcoxon, and SVC, so every method sees the same negative-control dataset. Each replicate records its seed, labels, group sizes, overlap, and label correlation in `permutation_metadata.csv`.
+
+Assignments are sampled directly and uniformly from the fixed-margin label vectors whose absolute correlation with the original labels is strictly less than 0.6. This preserves the rule against nearly reproducing the original grouping or its reversal without a retry loop. It also handles unbalanced groups, resolving KI-009, and fails immediately with a clear message for the infeasible two-sample 1:1 case. This remains a constrained diagnostic under phenotype-label exchangeability, not unrestricted classical permutation inference, and its discovery counts do not estimate the fraction of baseline calls that are false.
+
+The smoke regression verifies that the forwarded count matrix is byte-identical to the cleaned input, group sizes and sample order are preserved, every label correlation satisfies the constraint, no replacement count matrix is created, and all non-ML methods consume each replicate exactly once.
+
+### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
+
+Resolved 2026-08-10 alongside KI-005. The raw 20--80% agreement rule and its 100-attempt retry loop were replaced by exact enumeration of the correlations attainable at the observed binary group sizes. The process draws directly from all valid fixed-margin assignments, so heavily unbalanced designs no longer fail merely because their unavoidable raw agreement is high.
+
+### KI-035: The quasi plot had an incorrect y-axis label
+
+Resolved 2026-08-10 alongside KI-003. [`QUASI_PLOTS`](modules/quasi_plots.nf) now labels the y-axis as a self-consistency metric and identifies each facet using both the reference- and alternative-group sample counts.

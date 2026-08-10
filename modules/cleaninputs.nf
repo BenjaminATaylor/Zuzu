@@ -3,8 +3,8 @@ process CLEANINPUTS {
     label 'small_job'
 
     input: 
-    path samplesheet
-    path countsframe
+    path(samplesheet, stageAs: 'staged_inputs/source_samplesheet.csv')
+    path(countsframe, stageAs: 'staged_inputs/source_countsframe.tsv')
     val reflevel
 
     output:

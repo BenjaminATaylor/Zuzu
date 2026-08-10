@@ -1,9 +1,10 @@
 process DESEQ_PERMUTE{
   
   label 'mid_job'
+  tag "replicate=${x}"
 
   input: 
-  tuple path(samplesheet), path(countsframe) 
+  tuple val(x), path(samplesheet), path(countsframe)
 
   output:
   path "deseq_table.csv", emit: outfile
@@ -18,14 +19,24 @@ process DESEQ_PERMUTE{
   samplesheet = read.csv("$samplesheet")
   countsframe.clean = read.csv("$countsframe", row.names = 1, check.names = FALSE)
 
+  # Restore sample sheet factor levels
+  reflevel = "$params.reflevel"
+  samplesheet\$phenotype = relevel(factor(samplesheet\$phenotype), ref = reflevel)
+  stopifnot(nlevels(samplesheet\$phenotype) == 2L,
+            identical(levels(samplesheet\$phenotype)[1], reflevel))
+  altlevel = setdiff(levels(samplesheet\$phenotype), reflevel)
+  stopifnot(length(altlevel) == 1L)
+
   #generate model
   dds = DESeqDataSetFromMatrix(countData = countsframe.clean,
                                colData = samplesheet,
                                design = as.formula(~phenotype))
   # Run the default analysis for DESeq2
   dds.deg = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
-  nDEGs = nrow(subset(results(dds.deg),padj<0.05))
+  deseq.results = results(dds.deg,
+                          contrast = c("phenotype", altlevel, reflevel))
+  nDEGs = nrow(subset(deseq.results,padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  write.csv(data.frame(results(dds.deg)),row.names=TRUE, file = "deseq_table.csv")
+  write.csv(data.frame(deseq.results),row.names=TRUE, file = "deseq_table.csv")
   """
 }
