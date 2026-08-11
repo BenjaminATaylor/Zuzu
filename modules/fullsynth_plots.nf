@@ -48,10 +48,15 @@ process FULLSYNTH_PLOTS {
         summarize(mean = mean(value)) %>%
         mutate(mean = signif(mean, 3))
 
-    # Take FDP as inverse so higher values are better (matches power and normAUC)
+    # Take FDP as inverse so higher values are better (matching power and
+    # Youden's index).
     gg.synth.input\$mean[which(gg.synth.input\$variable == "FDP")] =
         1 - gg.synth.input\$mean[which(gg.synth.input\$variable == "FDP")]
-    gg.synth.input\$variable = fct_recode(gg.synth.input\$variable, "1-FDP" = "FDP")
+    gg.synth.input\$variable = fct_recode(
+        gg.synth.input\$variable,
+        "1-FDP" = "FDP",
+        "Youden's index" = "youden_index"
+    )
 
     gg.synth = ggplot(gg.synth.input, aes(x = depth, y = samplenum)) +
         geom_tile(aes(fill = mean), color = "gray20", size = .75, width = 1, height = 1) +
@@ -59,7 +64,7 @@ process FULLSYNTH_PLOTS {
                    lineheight = 0.75, size = 3.5, alpha = 0.7, fill = "gray10") +
         scale_x_discrete("Sequencing depth",  expand = c(0, 0)) +
         scale_y_discrete("Replicates per treatment", expand = c(0, 0)) +
-        scale_fill_viridis(option = "plasma", limits = c(0, 1), expand = c(0, 0)) +
+        scale_fill_viridis(option = "plasma", limits = c(-1, 1), expand = c(0, 0)) +
         facet_grid(variable ~ method) +
         theme_bw() +
         theme(panel.grid      = element_blank(),

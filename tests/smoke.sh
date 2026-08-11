@@ -539,7 +539,8 @@ verify_quasi_sample_sizes() {
                     gsub(/^"|"$/, "", $i)
                     column[$i] = i
                 }
-                if (!("refnum" in column) || !("altnum" in column) || !("totalnum" in column)) {
+                if (!("refnum" in column) || !("altnum" in column) || !("totalnum" in column) ||
+                    !("youden_index" in column) || ("normAUC" in column)) {
                     exit 2
                 }
                 next
@@ -551,13 +552,18 @@ verify_quasi_sample_sizes() {
                 refnum = $(column["refnum"])
                 altnum = $(column["altnum"])
                 totalnum = $(column["totalnum"])
+                youden_index = $(column["youden_index"])
                 if (refnum !~ /^[0-9]+$/ || altnum !~ /^[0-9]+$/ || totalnum !~ /^[0-9]+$/) {
                     exit 3
                 }
                 if (totalnum != refnum + altnum) {
                     exit 4
                 }
-                printf "%d %d %d\n", refnum, altnum, totalnum
+                if (youden_index !~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/ ||
+                    youden_index < -1 || youden_index > 1) {
+                    exit 6
+                }
+                printf "%d %d %d %.17g\n", refnum, altnum, totalnum, youden_index
                 next
             }
             END {

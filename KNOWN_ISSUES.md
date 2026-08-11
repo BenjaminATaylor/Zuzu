@@ -15,19 +15,11 @@ None currently.
 
 ## High
 
-### KI-007: Reported ROC AUC is calculated from binary DEG calls
-
-The quasi and full-synthetic analyzers pass binary selected/not-selected calls to the ROC calculation instead of a continuous statistic or score. With a binary predictor, the resulting AUC is equivalent to balanced accuracy at one threshold, potentially after pROC automatically reverses the score direction. `normAUC = 2 * AUC - 1` is the corresponding single-threshold Youden index rather than an area over a multi-threshold ROC curve.
-
-Affected modules include the `*_quasi.nf`, `*_fullsynth.nf`, and [`svc_fullsynth_postprocess.nf`](modules/svc_fullsynth_postprocess.nf) analyzers.
-
-Impact: `normAUC` is mislabelled and does not provide the claimed threshold-independent balance of power and false discovery.
-
 ### KI-008: Empty discovery or truth sets produce invalid metrics and summaries
 
 The quasi and synthetic analyzers calculate FDP as `1 - TP / calls`. When a method makes no calls, this becomes `0 / 0` and yields `NaN`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) then averages values without removing missing values, so one empty-call replicate can blank an entire summary cell.
 
-If the simulated truth set is empty, power also divides by zero and ROC has only one response class. This can occur with an invalid zero DEG proportion or if simulator filtering removes all simulated DE genes, and may abort analysis rather than merely produce a missing summary.
+If the simulated truth set is empty, power also divides by zero and Youden's index has no positive truth class; if every gene is in the truth set, it has no negative truth class. This can occur with an invalid DEG proportion or if simulator filtering removes all simulated DE or background genes, and may produce invalid metrics or abort analysis.
 
 Impact: valid empty-set outcomes can corrupt summaries or fail tasks. Counts of TP, FP, TN, FN, tested genes, called genes, and truth genes should be retained; zero-call and zero-truth conventions should be defined explicitly.
 
@@ -63,7 +55,7 @@ Impact: selected genes are predictive features, not directly equivalent to FDR-c
 
 The quasi-permutation branch deliberately derives a separate set of high-confidence anchor genes with each method, retains half of those genes unchanged, and asks the same method to recover them after the remaining genes are permuted. This is a method-specific self-consistency analysis, not a benchmark against independent biological truth. Different methods are not expected to share an anchor set or quasi-permuted dataset, and their resulting values are not direct measures of comparative accuracy.
 
-The README now states this distinction, but process outputs and plots still label the quantities as `power`, `FDP`, and `normAUC`, use `trueDEGs` for method-selected anchors, and display methods side by side. The separate mathematical problem with `normAUC` is covered by KI-007.
+The README now states this distinction, but process outputs still use the fields `power`, `FDP`, and `youden_index`, plots still present Power, FDP, and Youden's index side by side across methods, and the workflow uses `trueDEGs` for method-selected anchors. KI-007 corrected the former ROC AUC terminology, but this presentation can still imply externally validated accuracy in the quasi branch.
 
 Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
 
@@ -234,6 +226,12 @@ The smoke regression verifies that the forwarded count matrix is byte-identical 
 Resolved 2026-08-10. [`CLEANINPUTS`](modules/cleaninputs.nf) now calculates counts per million from each sample's rounded, unfiltered library total and retains genes with at least 1 CPM in at least as many samples as the smaller phenotype group. Group size determines the required prevalence, but group membership is not used in any gene's filtering decision. The retained count values are not transformed, and the same filtered matrix is shared by QC and every baseline, null-permutation, and quasi-permutation method. If more than half of the input genes are removed, the process reports the counts and percentage in a visible warning while continuing with the retained genes. The full-synthetic branch remains separate under KI-016.
 
 The smoke fixture includes sentinel genes confirming that below-CPM and insufficiently prevalent genes are removed, sufficiently prevalent genes are retained, expression confined to one complete phenotype group is not discarded, retained counts remain unchanged, and a greater-than-50% removal warning reaches the console. A separate fixed-margin relabelling check confirmed that phenotype assignments do not alter the retained gene set.
+
+### KI-007: ROC AUC was calculated from binary DEG calls
+
+Resolved 2026-08-10. Every quasi and full-synthetic analyzer now calculates signed Youden's index directly from the binary truth and call vectors as sensitivity minus false-positive rate. Outputs use the `youden_index` field, and plots label the metric as Youden's index over its full -1 to 1 range. The pROC calculation and its automatic score-direction selection were removed, so an inverted result remains negative rather than being presented as successful discrimination.
+
+The metric is explicitly documented as a summary at the fixed DEG or feature-selection threshold. Zuzu no longer describes it as a threshold-independent ROC AUC or as a balance between power and false discovery proportion.
 
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 

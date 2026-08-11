@@ -167,7 +167,7 @@ subset(res.LFC1.perm, padj<0.05)
 
 # Run DE analysis and generate a list of genes to take as true positive. We can take this directly from the orig process
 # Select a random half of these genes to keep steady, and note down those genes. Permute all other genes, 50 times
-# For each permutation, re-run DESeq2. Then compare to the list of true positive to produce metrics: Power, FDP and ROC AUC
+# For each permutation, re-run DESeq2. Then compare to the list of true positives to produce metrics: Power, FDP and Youden's index
 
 DEBUG=TRUE
 
@@ -206,14 +206,13 @@ power = length(which(keepdegs %in% quasidegs))/length(keepdegs)
 # 2. FDP: the proportion of all DEGs that are false positives
 FDP = 1-(length(which(quasidegs %in% keepdegs))/length(quasidegs))
 
-# 3. ROC AUC
-library("pROC")
+# 3. Youden's index at the DEG threshold
 allgenes = row.names(results(dds.deg.quasi))
-truelabels = as.numeric(allgenes %in% keepdegs)
-quasilabels = as.numeric(allgenes %in% quasidegs)
-AUC = auc(truelabels, quasilabels)
-# Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-normAUC = (AUC-0.5)*2
+truth = allgenes %in% keepdegs
+called = allgenes %in% quasidegs
+sensitivity = sum(called & truth) / sum(truth)
+false_positive_rate = sum(called & !truth) / sum(!truth)
+youden_index = sensitivity - false_positive_rate
 
 ## 'Permuted' and 'semi-synthetic' datasets used by Li et al
 # Permuted: 
@@ -232,5 +231,4 @@ normAUC = (AUC-0.5)*2
 # Then estimated FDR as the average FDP over 50 simulated datasets
 ## Third: Power = here, the poportion of true DEGs identified as DEGs
 # Aagin, calculated with semi-synthetic dataset and averaged across 50 datasets
-
 

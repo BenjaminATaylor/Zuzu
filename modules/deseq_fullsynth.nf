@@ -18,7 +18,6 @@ process DESEQ_FULLSYNTH{
     #!/usr/bin/env Rscript
     library("tidyverse", quietly = TRUE)
     library("DESeq2", quietly = TRUE)
-    library("pROC", quietly = TRUE)
 
     samplesheet = read.csv("$samplesheet")
     countsframe = read.csv("$countsframe", row.names = 1, check.names = F)
@@ -52,16 +51,16 @@ process DESEQ_FULLSYNTH{
     # 2. FDP: the proportion of all DEGs that are false positives
     FDP = 1-(length(which(degs %in% truedegs))/length(degs))
 
-    # 3. ROC AUC
+    # 3. Youden's index at the DEG threshold
     allgenes = row.names(deseq.results)
-    truelabels = as.numeric(allgenes %in% truedegs)
-    labels = as.numeric(allgenes %in% degs)
-    AUC = auc(truelabels, labels)
-    # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-    normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+    truth = allgenes %in% truedegs
+    called = allgenes %in% degs
+    sensitivity = sum(called & truth) / sum(truth)
+    false_positive_rate = sum(called & !truth) / sum(!truth)
+    youden_index = sensitivity - false_positive_rate
 
     # Save outputs
-    outframe = data.frame(method = "DESeq2", power = power, FDP = FDP, normAUC = normAUC, samplenum = samplenum, depth = depth)
+    outframe = data.frame(method = "DESeq2", power = power, FDP = FDP, youden_index = youden_index, samplenum = samplenum, depth = depth)
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
 
     """

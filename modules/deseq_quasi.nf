@@ -19,7 +19,6 @@ process DESEQ_QUASI {
   #!/usr/bin/env Rscript
   library("tidyverse", quietly = TRUE)
   library("DESeq2", quietly = TRUE)
-  library("pROC", quietly = TRUE)
 
   DEBUG=FALSE
 
@@ -66,23 +65,23 @@ process DESEQ_QUASI {
     # 2. FDP: the proportion of all DEGs that are false positives
     FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
 
-    # 3. ROC AUC
+    # 3. Youden's index at the DEG threshold
     allgenes = row.names(deseq.results)
-    truelabels = as.numeric(allgenes %in% truedegs)
-    quasilabels = as.numeric(allgenes %in% quasidegs)
-    AUC = auc(truelabels, quasilabels)
-    # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-    normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+    truth = allgenes %in% truedegs
+    called = allgenes %in% quasidegs
+    sensitivity = sum(called & truth) / sum(truth)
+    false_positive_rate = sum(called & !truth) / sum(!truth)
+    youden_index = sensitivity - false_positive_rate
 
   } else {
     power = NA
     FDP = NA
-    normAUC = NA
+    youden_index = NA
   }
 
   outframe = data.frame(power = power,
                         FDP = FDP,
-                        normAUC = normAUC,
+                        youden_index = youden_index,
                         replicate = replicate.id,
                         refnum = ref.num,
                         altnum = alt.num,

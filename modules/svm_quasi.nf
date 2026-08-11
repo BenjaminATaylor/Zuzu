@@ -14,7 +14,6 @@ process SVM_QUASI {
   library(tidyverse)
   library(e1071)
   library(pracma) # for movavg
-  library("pROC")
     
   # Read in raw data 
   data.y = read.csv(file = "$samplesheet")
@@ -159,19 +158,19 @@ process SVM_QUASI {
     # 2. FDP: the proportion of all DEGs that are false positives
     FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
 
-    # 3. ROC AUC
+    # 3. Youden's index at the selected-feature threshold
     allgenes = row.names(data.x)
-    truelabels = as.numeric(allgenes %in% truedegs)
-    quasilabels = as.numeric(allgenes %in% quasidegs)
-    AUC = auc(truelabels, quasilabels)
-    # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-    normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+    truth = allgenes %in% truedegs
+    called = allgenes %in% quasidegs
+    sensitivity = sum(called & truth) / sum(truth)
+    false_positive_rate = sum(called & !truth) / sum(!truth)
+    youden_index = sensitivity - false_positive_rate
 
     # Save outputs
-    outframe = data.frame(power = power, FDP = FDP, normAUC = normAUC, samplenum = samplenum)
+    outframe = data.frame(power = power, FDP = FDP, youden_index = youden_index, samplenum = samplenum)
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
   } else {
-    outframe = data.frame(power = NA, FDP = NA, normAUC = NA, samplenum = samplenum)
+    outframe = data.frame(power = NA, FDP = NA, youden_index = NA, samplenum = samplenum)
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
   }
 

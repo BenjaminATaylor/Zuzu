@@ -24,7 +24,7 @@ process QUASI_PLOTS{
       mutate(method = label) %>%
       melt(
         id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),
-        measure.vars = c("power", "FDP", "normAUC")
+        measure.vars = c("power", "FDP", "youden_index")
       )
   }
 
@@ -33,13 +33,15 @@ process QUASI_PLOTS{
     read_quasis("edger",  "edgeR"),
     read_quasis("wilcox", "Wilcoxon")
   ) %>%
+    mutate(variable = fct_recode(variable,
+                                 "Youden's index" = "youden_index")) %>%
     mutate(sample_size = paste0(refnum, " ref + ", altnum, " alt")) %>%
     arrange(totalnum, refnum, altnum) %>%
     mutate(sample_size = factor(sample_size, levels = unique(sample_size)))
 
   gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
     geom_point(size = 3, alpha = 0.7) +
-    scale_y_continuous(limits = c(0,1)) +
+    scale_y_continuous(limits = c(-1,1)) +
     labs(x = "Method", y = "Self-consistency metric") +
     facet_grid(sample_size~variable) +
     theme_bw() +

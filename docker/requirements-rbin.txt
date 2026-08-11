@@ -6,7 +6,6 @@ r-cran-pheatmap
 r-cran-ggpubr
 r-cran-vcd
 r-cran-viridis
-r-cran-proc
 r-cran-upsetr
 r-bioc-deseq2
 r-bioc-edger
