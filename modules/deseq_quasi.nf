@@ -58,58 +58,54 @@ process DESEQ_QUASI {
   n.truth = length(truedegs)
   n.background = n.tested - n.truth
 
-  true.positives = NA_integer_
-  false.positives = NA_integer_
-  true.negatives = NA_integer_
-  false.negatives = NA_integer_
-  n.called = NA_integer_
-  metric.status = "insufficient_truth"
+  # Run the default analysis for DESeq2
+  dds = DESeqDataSetFromMatrix(countData = quasi.frame,
+                              colData = samplesheet,
+                              design = as.formula(~phenotype))
+  dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
+  deseq.results = results(dds.deg.quasi,
+                          contrast = c("phenotype", altlevel, reflevel))
+  stopifnot(identical(row.names(deseq.results), allgenes))
 
-  # Generate output metrics only if there are more than 10 'true' DEGs, otherwise output NAs
-  if(length(truedegs)>10){
-    #generate model
-    dds = DESeqDataSetFromMatrix(countData = quasi.frame,
-                                colData = samplesheet,
-                                design = as.formula(~phenotype))
-    # Run the default analysis for DESeq2
-    dds.deg.quasi = DESeq(dds, fitType = "parametric", betaPrior = FALSE)
-    deseq.results = results(dds.deg.quasi,
-                            contrast = c("phenotype", altlevel, reflevel))
-    stopifnot(identical(row.names(deseq.results), allgenes))
+  # Classify every gene in the fixed quasi-permutation universe
+  quasidegs = row.names(subset(deseq.results,padj<0.05))
+  if(DEBUG){quasidegs = sample(row.names(deseq.results),200)}
+  #if(DEBUG){quasidegs = sample(truedegs, 70)}
+  truth = allgenes %in% truedegs
+  called = allgenes %in% quasidegs
+  true.positives = sum(called & truth)
+  false.positives = sum(called & !truth)
+  true.negatives = sum(!called & !truth)
+  false.negatives = sum(!called & truth)
+  n.called = sum(called)
 
-    # Classify every gene in the fixed quasi-permutation universe.
-    quasidegs = row.names(subset(deseq.results,padj<0.05))
-    if(DEBUG){quasidegs = sample(row.names(deseq.results),200)}
-    #if(DEBUG){quasidegs = sample(truedegs, 70)}
-    truth = allgenes %in% truedegs
-    called = allgenes %in% quasidegs
-    true.positives = sum(called & truth)
-    false.positives = sum(called & !truth)
-    true.negatives = sum(!called & !truth)
-    false.negatives = sum(!called & truth)
-    n.called = sum(called)
+  # 1. Power: the proportion of retained anchor genes identified as DEGs in this comparison
+  # Power is undefined if no anchors were retained
+  power = if(n.truth == 0) NA_real_ else true.positives / n.truth
 
-    # 1. Power: the proportion of retained anchor genes identified as DEGs in this comparison
-    power = true.positives / n.truth
+  # 2. FDP: the proportion of all identified DEGs that fall outside the retained anchor set
+  # FDP is defined as zero if no DEGs are identified
+  FDP = if(n.called == 0) 0 else false.positives / n.called
 
-    # 2. FDP: the proportion of all identified DEGs that fall outside the retained anchor set
-    # FDP is defined as zero if no DEGs are identified
-    FDP = if(n.called == 0) 0 else false.positives / n.called
-
-    # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the DEG threshold
-    if(n.background == 0){
-      youden_index = NA_real_
-      metric.status = "youden_undefined_no_background"
-    } else {
-      youden_index = (true.positives / n.truth) -
-                     (false.positives / n.background)
-      metric.status = if(n.called == 0) "no_calls" else "ok"
-    }
-
+  # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the DEG threshold
+  # Youden's index requires both anchor and background genes
+  youden_index = if(n.truth == 0 || n.background == 0){
+    NA_real_
   } else {
-    power = NA_real_
-    FDP = NA_real_
-    youden_index = NA_real_
+    (true.positives / n.truth) - (false.positives / n.background)
+  }
+
+  # Record the primary condition affecting metric interpretation
+  metric.status = if(n.truth == 0){
+    "no_anchors"
+  } else if(n.background == 0){
+    "youden_undefined_no_background"
+  } else if(n.truth <= 10){
+    "low_anchor_count"
+  } else if(n.called == 0){
+    "no_calls"
+  } else {
+    "ok"
   }
 
   outframe = data.frame(power = power,

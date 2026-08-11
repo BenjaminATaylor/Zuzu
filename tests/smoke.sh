@@ -157,8 +157,8 @@ if [[ "$smoke_synth" == 1 ]]; then
     synth_args=(--synthstep true --synthdeg_pct 0.1)
 fi
 
-# The relaxed test-only anchor threshold makes the compact fixture exercise the
-# quasi recovery calculations rather than only their too-few-anchors fallback.
+# The relaxed test-only anchor threshold gives the main smoke run stable,
+# nonempty anchor sets. Focused checks below cover the zero- and low-anchor cases.
 (
     cd "$launch_dir"
     NXF_ANSI_LOG=false nextflow \
@@ -590,47 +590,105 @@ validate_quasi_metric_rows() {
             altnum = $(column["altnum"])
             totalnum = $(column["totalnum"])
 
-            if (!is_number(power) || !is_number(FDP) || !is_number(youden)) exit 4
+            if (!is_number(FDP)) exit 4
             if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
                 !is_integer(n_tested) || !is_integer(n_called) || !is_integer(n_truth) ||
                 !is_integer(n_background) || !is_integer(replicate) || !is_integer(refnum) ||
                 !is_integer(altnum) || !is_integer(totalnum)) exit 5
-            if (n_truth == 0 || n_background == 0) exit 6
-            if (n_tested != TP + FP + TN + FN ||
+            if (n_tested == 0 || n_tested != TP + FP + TN + FN ||
                 n_called != TP + FP || n_truth != TP + FN ||
-                n_background != FP + TN || n_tested != n_truth + n_background) exit 7
-            if (totalnum != refnum + altnum) exit 8
+                n_background != FP + TN || n_tested != n_truth + n_background) exit 6
+            if (totalnum != refnum + altnum) exit 7
 
-            expected_status = n_called == 0 ? "no_calls" : "ok"
-            if (status != expected_status) exit 9
-            expected_power = TP / n_truth
             expected_FDP = n_called == 0 ? 0 : FP / n_called
-            expected_youden = expected_power - (FP / n_background)
-            if (absolute(power - expected_power) > 1e-9 ||
-                absolute(FDP - expected_FDP) > 1e-9 ||
-                absolute(youden - expected_youden) > 1e-9) exit 10
-            if (power < 0 || power > 1 || FDP < 0 || FDP > 1 ||
-                youden < -1 || youden > 1) exit 11
+            if (absolute(FDP - expected_FDP) > 1e-9 || FDP < 0 || FDP > 1) exit 8
+
+            if (n_truth == 0) {
+                if (power != "NA" || youden != "NA") exit 9
+            } else {
+                if (!is_number(power)) exit 10
+                expected_power = TP / n_truth
+                if (absolute(power - expected_power) > 1e-9 || power < 0 || power > 1) exit 11
+
+                if (n_background == 0) {
+                    if (youden != "NA") exit 12
+                } else {
+                    if (!is_number(youden)) exit 13
+                    expected_youden = expected_power - (FP / n_background)
+                    if (absolute(youden - expected_youden) > 1e-9 ||
+                        youden < -1 || youden > 1) exit 14
+                }
+            }
+
+            if (n_truth == 0) {
+                expected_status = "no_anchors"
+            } else if (n_background == 0) {
+                expected_status = "youden_undefined_no_background"
+            } else if (n_truth <= 10) {
+                expected_status = "low_anchor_count"
+            } else {
+                expected_status = n_called == 0 ? "no_calls" : "ok"
+            }
+            if (status != expected_status) exit 15
 
             method = require_method ? $(column["method"]) : ""
             if (require_method) {
-                if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 12
+                if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 16
                 key = method SUBSEP replicate SUBSEP refnum SUBSEP altnum
-                if (seen[key]++) exit 13
+                if (seen[key]++) exit 17
                 method_count[method] += 1
             }
             printf "%d %d %s\n", refnum, altnum, method
         }
         END {
-            if (data_rows != expected_rows) exit 14
+            if (data_rows != expected_rows) exit 18
             if (require_method) {
                 expected_per_method = expected_rows / 3
                 if (method_count["DESeq2"] != expected_per_method ||
                     method_count["edgeR"] != expected_per_method ||
-                    method_count["Wilcoxon"] != expected_per_method) exit 15
+                    method_count["Wilcoxon"] != expected_per_method) exit 19
             }
         }
     ' "$metrics_file"
+}
+
+# Verify the zero-, low-, and adequate-anchor metric conventions directly
+verify_quasi_anchor_contract() {
+    contract_file="$smoke_root/quasi_anchor_contract.csv"
+    invalid_contract_file="$smoke_root/quasi_anchor_contract_invalid.csv"
+
+    printf '%s\n' \
+        'power,FDP,youden_index,true_positives,false_positives,true_negatives,false_negatives,n_tested,n_called,n_truth,n_background,metric_status,replicate,refnum,altnum,totalnum' \
+        'NA,0,NA,0,0,20,0,20,0,0,20,no_anchors,1,5,5,10' \
+        'NA,1,NA,0,2,18,0,20,2,0,20,no_anchors,2,5,5,10' \
+        '1,0.5,0.947368421052632,1,1,18,0,20,2,1,19,low_anchor_count,3,5,5,10' \
+        '0,0,0,0,0,10,10,20,0,10,10,low_anchor_count,4,5,5,10' \
+        '0,0,0,0,0,9,11,20,0,11,9,no_calls,5,5,5,10' \
+        '0.4,0,NA,2,0,0,3,5,2,5,0,youden_undefined_no_background,6,5,5,10' \
+        > "$contract_file"
+
+    validate_quasi_metric_rows "$contract_file" 6 0 >/dev/null ||
+        fail "quasi anchor-count metric contract is invalid"
+
+    printf '%s\n' \
+        'power,FDP,youden_index,true_positives,false_positives,true_negatives,false_negatives,n_tested,n_called,n_truth,n_background,metric_status,replicate,refnum,altnum,totalnum' \
+        '0,0,0,0,0,20,0,20,0,0,20,no_anchors,1,5,5,10' \
+        > "$invalid_contract_file"
+
+    if validate_quasi_metric_rows "$invalid_contract_file" 1 0 >/dev/null 2>&1; then
+        fail "quasi validator accepted defined recovery metrics with no anchors"
+    fi
+
+    for quasi_module in deseq_quasi.nf edger_quasi.nf wilcoxon_quasi.nf; do
+        module_path="$repo_dir/modules/$quasi_module"
+        grep -q '"no_anchors"' "$module_path" ||
+            fail "$quasi_module does not report the no-anchor state"
+        grep -q '"low_anchor_count"' "$module_path" ||
+            fail "$quasi_module does not report the low-anchor state"
+        if grep -Eq 'length\(truedegs\)[[:space:]]*>?=[[:space:]]*10|length\(truedegs\)[[:space:]]*>[[:space:]]*10|insufficient_truth' "$module_path"; then
+            fail "$quasi_module still censors low-anchor datasets"
+        fi
+    done
 }
 
 verify_quasi_metrics() {
@@ -873,6 +931,7 @@ verify_reference_direction
 verify_null_permutations
 verify_permutation_trace_keys
 verify_quasi_trace_keys
+verify_quasi_anchor_contract
 verify_quasi_metrics
 if [[ "$smoke_synth" == 1 ]]; then
     verify_fullsynth_metrics

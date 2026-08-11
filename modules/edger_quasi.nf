@@ -57,63 +57,59 @@ process EDGER_QUASI {
     n.truth = length(truedegs)
     n.background = n.tested - n.truth
 
-    true.positives = NA_integer_
-    false.positives = NA_integer_
-    true.negatives = NA_integer_
-    false.negatives = NA_integer_
-    n.called = NA_integer_
-    metric.status = "insufficient_truth"
+    # Run edgeR using the quasi-permuted data
+    dds.edge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)
+    dds.edge = normLibSizes(dds.edge)
+    design.edge = model.matrix(~phenotype, data = samplesheet)
+    phenotype.coef = which(attr(design.edge, "assign") == 1L)
+    stopifnot(length(phenotype.coef) == 1L)
+    stopifnot(all(design.edge[samplesheet\$phenotype == reflevel, phenotype.coef] == 0),
+              all(design.edge[samplesheet\$phenotype == altlevel, phenotype.coef] == 1))
+    edge.contrast = rep(0, ncol(design.edge))
+    edge.contrast[phenotype.coef] = 1
+    dds.edge.est = estimateDisp(dds.edge,design.edge)
+    edge.fit = glmQLFit(dds.edge.est,design.edge)
+    edge.qlf = glmQLFTest(edge.fit,contrast=edge.contrast)
+    edge.out.quasi = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH"))
+    stopifnot(identical(row.names(edge.out.quasi), allgenes))
 
-    # Generate output metrics only if there are more than 10 'true' DEGs, otherwise output NAs
-    if(length(truedegs)>10){
+    # Classify every gene in the fixed quasi-permutation universe
+    quasidegs = row.names(subset(edge.out.quasi,padj<0.05))
+    truth = allgenes %in% truedegs
+    called = allgenes %in% quasidegs
+    true.positives = sum(called & truth)
+    false.positives = sum(called & !truth)
+    true.negatives = sum(!called & !truth)
+    false.negatives = sum(!called & truth)
+    n.called = sum(called)
 
-        #edgeR analysis using quasi-permuted data
-        dds.edge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)
-        dds.edge = normLibSizes(dds.edge)
-        design.edge = model.matrix(~phenotype, data = samplesheet)
-        phenotype.coef = which(attr(design.edge, "assign") == 1L)
-        stopifnot(length(phenotype.coef) == 1L)
-        stopifnot(all(design.edge[samplesheet\$phenotype == reflevel, phenotype.coef] == 0),
-                  all(design.edge[samplesheet\$phenotype == altlevel, phenotype.coef] == 1))
-        edge.contrast = rep(0, ncol(design.edge))
-        edge.contrast[phenotype.coef] = 1
-        dds.edge.est = estimateDisp(dds.edge,design.edge)
-        edge.fit = glmQLFit(dds.edge.est,design.edge)
-        edge.qlf = glmQLFTest(edge.fit,contrast=edge.contrast)
-        edge.out.quasi = edge.qlf\$table %>% mutate(padj = p.adjust(PValue, method = "BH")) 
-        stopifnot(identical(row.names(edge.out.quasi), allgenes))
+    # 1. Power: the proportion of retained anchor genes identified as DEGs in this comparison
+    # Power is undefined if no anchors were retained
+    power = if(n.truth == 0) NA_real_ else true.positives / n.truth
 
-        # Classify every gene in the fixed quasi-permutation universe.
-        quasidegs = row.names(subset(edge.out.quasi,padj<0.05))
-        truth = allgenes %in% truedegs
-        called = allgenes %in% quasidegs
-        true.positives = sum(called & truth)
-        false.positives = sum(called & !truth)
-        true.negatives = sum(!called & !truth)
-        false.negatives = sum(!called & truth)
-        n.called = sum(called)
+    # 2. FDP: the proportion of all identified DEGs that fall outside the retained anchor set
+    # FDP is defined as zero if no DEGs are identified
+    FDP = if(n.called == 0) 0 else false.positives / n.called
 
-        # 1. Power: the proportion of retained anchor genes identified as DEGs in this comparison
-        power = true.positives / n.truth
-
-        # 2. FDP: the proportion of all identified DEGs that fall outside the retained anchor set
-        # FDP is defined as zero if no DEGs are identified
-        FDP = if(n.called == 0) 0 else false.positives / n.called
-
-        # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the DEG threshold
-        if(n.background == 0){
-            youden_index = NA_real_
-            metric.status = "youden_undefined_no_background"
-        } else {
-            youden_index = (true.positives / n.truth) -
-                           (false.positives / n.background)
-            metric.status = if(n.called == 0) "no_calls" else "ok"
-        }
-
+    # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the DEG threshold
+    # Youden's index requires both anchor and background genes
+    youden_index = if(n.truth == 0 || n.background == 0){
+        NA_real_
     } else {
-        power = NA_real_
-        FDP = NA_real_
-        youden_index = NA_real_
+        (true.positives / n.truth) - (false.positives / n.background)
+    }
+
+    # Record the primary condition affecting metric interpretation
+    metric.status = if(n.truth == 0){
+        "no_anchors"
+    } else if(n.background == 0){
+        "youden_undefined_no_background"
+    } else if(n.truth <= 10){
+        "low_anchor_count"
+    } else if(n.called == 0){
+        "no_calls"
+    } else {
+        "ok"
     }
 
     outframe = data.frame(power = power,

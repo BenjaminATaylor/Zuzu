@@ -37,19 +37,40 @@ process QUASI_PLOTS{
   # Reshape the self-consistency metrics for faceted plotting
   gg.quasi.input = melt(
     quasi.results,
-    id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),
+    id.vars = c("method", "replicate", "refnum", "altnum", "totalnum", "n_truth"),
     measure.vars = c("power", "FDP", "youden_index")
   ) %>%
     mutate(variable = fct_recode(variable,
                                  "Youden's index" = "youden_index")) %>%
     mutate(sample_size = paste0(refnum, " ref + ", altnum, " alt")) %>%
     arrange(totalnum, refnum, altnum) %>%
-    mutate(sample_size = factor(sample_size, levels = unique(sample_size)))
+    mutate(sample_size = factor(sample_size, levels = unique(sample_size))) %>%
+    mutate(anchor_count = case_when(
+      n_truth == 0  ~ "No anchors",
+      n_truth <= 10 ~ "1-10 anchors",
+      TRUE          ~ ">10 anchors"
+    )) %>%
+    mutate(anchor_count = factor(
+      anchor_count,
+      levels = c(">10 anchors", "1-10 anchors", "No anchors")
+    ))
 
-  gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value)) +
-    geom_point(size = 3, alpha = 0.7) +
+  # Mark results calculated from small or empty anchor sets
+  gg.quasi = ggplot(gg.quasi.input, aes(x = method, y = value, shape = anchor_count)) +
+    geom_point(size = 3, alpha = 0.7, na.rm = TRUE) +
+    scale_shape_manual(values = c(
+      ">10 anchors" = 16,
+      "1-10 anchors" = 1,
+      "No anchors" = 4
+    )) +
     scale_y_continuous(limits = c(-1,1)) +
-    labs(x = "Method", y = "Self-consistency metric") +
+    labs(x = "Method",
+         y = "Self-consistency metric",
+         shape = "Retained anchors",
+         caption = paste(
+           "Power and Youden's index are undefined when no anchors are retained;",
+           "Youden's index is also undefined when no background genes remain."
+         )) +
     facet_grid(sample_size~variable) +
     theme_bw() +
     theme(strip.background = element_blank())

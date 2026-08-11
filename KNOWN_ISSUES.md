@@ -15,12 +15,6 @@ None currently.
 
 ## High
 
-### KI-010: Quasi results are censored when too few retained genes are available
-
-The quasi analyzers emit `NA` metrics with an `insufficient_truth` status when the retained truth set contains ten or fewer genes. KI-008 added the tested, truth, and background counts needed to identify these rows, but did not change the censoring rule.
-
-Impact: methods producing fewer high-confidence anchor calls, stringent cutoffs, and smaller sample sizes disappear from summaries rather than recording low or uncertain performance, creating method- and sample-size-dependent missingness.
-
 ### KI-011: Synthetic analysis ignores the alternative-group sample size
 
 [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) accepts both `refnum` and `altnum`, but passes only `refnum` to compcodeR as `samples.per.cond`. Every synthetic dataset is therefore balanced even when the source groups and calculated breaks are unequal.
@@ -227,15 +221,21 @@ The metric is explicitly documented as a summary at the fixed DEG or feature-sel
 
 ### KI-008: Empty discovery or truth sets produced invalid metrics and summaries
 
-Resolved 2026-08-11. Whenever a quasi or full-synthetic analyzer evaluates metrics, it now derives power, FDP, and Youden's index from explicit true-positive, false-positive, true-negative, and false-negative counts over one fixed gene universe. Outputs also retain the tested, called, truth, and background sizes plus a metric status. `n_tested` denotes this full input universe, so genes with unavailable adjusted p-values after internal method filtering remain uncalled rather than leaving the denominator. Quasi rows censored under KI-010 retain the universe sizes and `insufficient_truth` status while their unavailable call and confusion counts remain `NA`. An evaluated method making no calls receives power 0, FDP 0 under the standard `FP / max(calls, 1)` convention, and Youden's index 0 when both truth classes exist.
+Resolved 2026-08-11. Whenever a quasi or full-synthetic analyzer evaluates metrics, it now derives power, FDP, and Youden's index from explicit true-positive, false-positive, true-negative, and false-negative counts over one fixed gene universe. Outputs also retain the tested, called, truth, and background sizes plus a metric status. `n_tested` denotes this full input universe, so genes with unavailable adjusted p-values after internal method filtering remain uncalled rather than leaving the denominator. KI-010 subsequently removed the quasi branch's temporary ten-anchor censoring, so active quasi rows now retain complete call and confusion counts even when few or no anchors are available. A method making no calls receives FDP 0 under the standard `FP / max(calls, 1)` convention; power and Youden's index are also zero when both truth classes exist, but remain undefined when their required classes are absent.
 
 [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now rejects empty generated matrices, duplicate identifiers, truth genes absent from the generated count matrix, and synthetic benchmarks lacking either a true or background class. The analyzers repeat the truth-universe checks defensively. SVC pare mode records unmodelled genes as uncalled so debugging does not change the benchmark denominator.
 
-[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show the valid denominator. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, status, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
+[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show the valid denominator. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, zero- and low-anchor statuses, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
 
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 
 Resolved 2026-08-10 alongside KI-005. The raw 20--80% agreement rule and its 100-attempt retry loop were replaced by exact enumeration of the correlations attainable at the observed binary group sizes. The process draws directly from all valid fixed-margin assignments, so heavily unbalanced designs no longer fail merely because their unavoidable raw agreement is high.
+
+### KI-010: Quasi results were censored when too few retained genes were available
+
+Resolved 2026-08-11. The active DESeq2, edgeR, and Wilcoxon quasi analyzers now run for every retained-anchor count. Rows with one to ten anchors retain their complete confusion counts and calculated metrics with a `low_anchor_count` status when background genes remain, rather than disappearing behind an arbitrary cutoff. When no anchors are retained, the analyzers still report calls, confusion counts, and FDP under a `no_anchors` status; power and Youden's index remain `NA` because there is no positive class. If no background genes remain, Youden's index is `NA` under `youden_undefined_no_background` regardless of anchor count.
+
+[`QUASI_PLOTS`](modules/quasi_plots.nf) distinguishes adequate, low, and empty anchor sets by point shape and states why power and Youden's index are absent for empty sets. The smoke validator enforces the count identities, formulas, bounds, and status precedence for zero-, low-, and adequate-anchor rows, rejects defined recovery metrics without anchors, and guards the active analyzers against reintroducing the old gate.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 
