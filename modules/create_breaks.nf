@@ -17,6 +17,8 @@ process CREATE_BREAKS {
   samplesheet = read.csv("$samplesheet")
   reflevel = "$params.reflevel"
 
+  # Count samples in each phenotype group
+  # Generate three subsample sizes for each group
   reftot = nrow(subset(samplesheet, phenotype == reflevel))
   alttot = nrow(subset(samplesheet, phenotype != reflevel))
 

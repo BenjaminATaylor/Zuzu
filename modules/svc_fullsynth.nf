@@ -101,7 +101,8 @@ process SVC_FULLSYNTH{
     outframe = pd.concat([allgenes,genescores], axis=1)
     outframe.columns = ['gene', 'DEGstatus']
     outframe.to_csv("./svc_table.csv",sep =',',index=False)
-    
+
+    # Plot RFECV performance across feature-selection steps
     n_scores = len(rfecv.cv_results_["mean_test_score"])
     plt.figure()
     plt.xlabel("Number of features selected")

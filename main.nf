@@ -78,12 +78,14 @@ workflow {
 
   // Set a vector of depths across which to generate fullsynth datasets
   depths = channel.from(1E+5, 1E+6, 1E+7)
+  // Provide a placeholder path when ML outputs are disabled
   dummypath = channel.fromPath("0")
 
   //Initial data QC and cleanup
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
   QUALITYCONTROL(CLEANINPUTS.out)
   CREATE_BREAKS(ch_samplesheet)
+  // Emit each generated reference/alternative subsample pair
   breaks = CREATE_BREAKS.out.splitCsv(header: false)
 
 
@@ -119,6 +121,7 @@ workflow {
     params.mlstep ? SVC_BASIC.out.table : dummypath,
     params.mlstep ? SVC_PERMUTE.out.nDEGs.collect() : dummypath,
   )
+  // Compare baseline DEG calls across methods
   INTER_OBSERVER_BASIC(
     DESEQ_BASIC.out.table,
     DESEQ_BASIC.out.dds,
@@ -128,6 +131,7 @@ workflow {
       ? SVC_BASIC.out.table
       : dummypath,
   )
+  // Summarise per-gene selection across null permutations
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_PERMUTE.out.outfile.collect(),

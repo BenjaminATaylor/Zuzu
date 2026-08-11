@@ -25,6 +25,7 @@ process WILCOXON_FULLSYNTH{
     depth = $depth
     reflevel = "$params.reflevel"
 
+    # Validate the fixed synthetic evaluation universe
     allgenes = row.names(countsframe)
     if(anyDuplicated(allgenes)) stop("Synthetic count matrix contains duplicate gene identifiers")
     if(anyDuplicated(truedegs)) stop("Synthetic truth set contains duplicate gene identifiers")

@@ -26,6 +26,7 @@ process DESEQ_FULLSYNTH{
     truedegs = get(load("$truedegs"))
     depth = $depth
 
+    # Validate the fixed synthetic evaluation universe
     allgenes = row.names(countsframe)
     if(anyDuplicated(allgenes)) stop("Synthetic count matrix contains duplicate gene identifiers")
     if(anyDuplicated(truedegs)) stop("Synthetic truth set contains duplicate gene identifiers")

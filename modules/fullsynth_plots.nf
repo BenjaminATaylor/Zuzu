@@ -26,6 +26,7 @@ process FULLSYNTH_PLOTS {
             mutate(method = label)
     }
 
+    # Combine per-method results into one replicate-level table
     deseq.synth.input  = read_fullsynths("deseq",  "DESeq2")
     edger.synth.input  = read_fullsynths("edger",  "edgeR")
     wilcox.synth.input = read_fullsynths("wilcox", "Wilcoxon")
@@ -46,6 +47,7 @@ process FULLSYNTH_PLOTS {
         arrange(method, replicate, samplenum, depth)
     write.csv(fullsynth.results, "synth_results.csv", row.names = FALSE)
 
+    # Reshape and summarise benchmark metrics across replicates
     fullsynth.long = melt(
         fullsynth.results,
         id.vars = c("method", "replicate", "samplenum", "depth", "metric_status"),

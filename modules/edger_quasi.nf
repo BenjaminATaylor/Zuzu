@@ -29,13 +29,14 @@ process EDGER_QUASI {
     alt.num = as.integer($altnum)
     reflevel = "$params.reflevel"
 
-    # The quasi sample sheet has crossed another CSV boundary; restore its levels.
+    # Restore sample sheet factor levels
     samplesheet\$phenotype = relevel(factor(samplesheet\$phenotype), ref = reflevel)
     stopifnot(nlevels(samplesheet\$phenotype) == 2L,
               identical(levels(samplesheet\$phenotype)[1], reflevel))
     altlevel = setdiff(levels(samplesheet\$phenotype), reflevel)
     stopifnot(length(altlevel) == 1L)
 
+    # Validate sample sizes and count-matrix alignment
     observed.refnum = sum(samplesheet\$phenotype == reflevel)
     observed.altnum = sum(samplesheet\$phenotype != reflevel)
     stopifnot(observed.refnum == ref.num)
@@ -44,6 +45,7 @@ process EDGER_QUASI {
     stopifnot(ncol(quasi.frame) == ref.num + alt.num)
     stopifnot(identical(colnames(quasi.frame), samplesheet\$sample))
 
+    # Validate the anchors against the fixed quasi-permutation gene universe
     allgenes = row.names(quasi.frame)
     if(anyDuplicated(allgenes)) stop("Quasi count matrix contains duplicate gene identifiers")
     if(anyDuplicated(truedegs)) stop("Quasi truth set contains duplicate gene identifiers")

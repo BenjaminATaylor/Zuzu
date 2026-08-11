@@ -24,6 +24,7 @@ process QUASI_PLOTS{
       mutate(method = label)
   }
 
+  # Combine method-specific replicates into one ordered results table
   quasi.results = bind_rows(
     read_quasis("deseq",  "DESeq2"),
     read_quasis("edger",  "edgeR"),
@@ -33,6 +34,7 @@ process QUASI_PLOTS{
 
   write.csv(quasi.results, "quasi_results.csv", row.names = FALSE)
 
+  # Reshape the self-consistency metrics for faceted plotting
   gg.quasi.input = melt(
     quasi.results,
     id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),

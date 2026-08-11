@@ -22,6 +22,7 @@ process PERMUTE_HISTS{
 
   nperms = as.numeric("$params.nperms")
 
+  # Count how often each gene is selected across permutations
   read_permdegs_r = function(dir){
     lapply(list.files(dir, full.names = TRUE), function(x){
       res <- read.csv(x, row.names = 1)
@@ -78,6 +79,7 @@ process PERMUTE_HISTS{
    device = "pdf", bg = "transparent",
    width = 30, height = 20, units = "cm")
 
+  # Compare model fit for rarely and frequently selected genes
   if(nperms >= 5){
 
     floor   = nperms / 1000

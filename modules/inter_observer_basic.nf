@@ -66,6 +66,7 @@ process INTER_OBSERVER_BASIC{
         degs.svc = getdegs("svc_table.csv", ml=TRUE)
     }
 
+    # Combine adjusted p-values across the shared gene order
     compframe = cbind(select(deseq.table,padj), 
                     select(edger.table,padj),
                     select(wilcox.table,padj))  %>% 

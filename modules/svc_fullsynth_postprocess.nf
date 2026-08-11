@@ -26,6 +26,7 @@ process SVC_FULLSYNTH_POSTPROCESS{
     depth = $depth
     inframe = read.csv("$inframe", row.names = 1)
 
+    # Validate the fixed synthetic evaluation universe
     allgenes = row.names(inframe)
     if(anyDuplicated(allgenes)) stop("SVC output contains duplicate gene identifiers")
     if(anyDuplicated(truedegs)) stop("Synthetic truth set contains duplicate gene identifiers")
