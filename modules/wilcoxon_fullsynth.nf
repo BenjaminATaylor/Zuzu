@@ -6,6 +6,7 @@ process WILCOXON_FULLSYNTH{
           path(samplesheet), //"synthsheet.csv"
           path(countsframe), //"synthcounts.csv"
           val(refnum),
+          val(altnum),
           val(x)
 
     output:
@@ -19,7 +20,9 @@ process WILCOXON_FULLSYNTH{
 
     samplesheet = read.csv("$samplesheet")
     countsframe = read.csv("$countsframe", row.names = 1, check.names = F)
-    samplenum = $refnum
+    ref.num = as.integer($refnum)
+    alt.num = as.integer($altnum)
+    total.num = ref.num + alt.num
     replicate.id = $x
     truedegs = get(load("$truedegs"))
     depth = $depth
@@ -38,6 +41,21 @@ process WILCOXON_FULLSYNTH{
     n.background = n.tested - n.truth
     if(n.truth == 0) stop("Synthetic benchmark contains no true DEGs")
     if(n.background == 0) stop("Synthetic benchmark contains no background genes")
+
+    # Validate the requested group sizes and sample alignment
+    stopifnot(ref.num > 0L,
+              alt.num > 0L,
+              nrow(samplesheet) == total.num,
+              ncol(countsframe) == total.num,
+              !anyNA(samplesheet\$sample),
+              !anyNA(samplesheet\$phenotype),
+              !anyDuplicated(samplesheet\$sample),
+              !anyDuplicated(colnames(countsframe)),
+              identical(colnames(countsframe), as.character(samplesheet\$sample)),
+              length(unique(samplesheet\$phenotype)) == 2L,
+              reflevel %in% samplesheet\$phenotype,
+              sum(samplesheet\$phenotype == reflevel) == ref.num,
+              sum(samplesheet\$phenotype != reflevel) == alt.num)
 
     #Wilcox analysis for this dataset
     countsframe.dge = DGEList(counts=countsframe,group=samplesheet\$phenotype)
@@ -100,7 +118,9 @@ process WILCOXON_FULLSYNTH{
       n_background = n.background,
       metric_status = metric.status,
       replicate = replicate.id,
-      samplenum = samplenum,
+      refnum = ref.num,
+      altnum = alt.num,
+      totalnum = total.num,
       depth = depth
     )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)

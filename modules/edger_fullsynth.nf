@@ -6,6 +6,7 @@ process EDGER_FULLSYNTH{
           path(samplesheet), //"synthsheet.csv"
           path(countsframe), //"synthcounts.csv"
           val(refnum),
+          val(altnum),
           val(x)
 
     output:
@@ -19,7 +20,9 @@ process EDGER_FULLSYNTH{
 
     samplesheet = read.csv("$samplesheet")
     countsframe = read.csv("$countsframe", row.names = 1, check.names = F)
-    samplenum = $refnum
+    ref.num = as.integer($refnum)
+    alt.num = as.integer($altnum)
+    total.num = ref.num + alt.num
     replicate.id = $x
     truedegs = get(load("$truedegs"))
     depth = $depth
@@ -45,6 +48,18 @@ process EDGER_FULLSYNTH{
               identical(levels(samplesheet\$phenotype)[1], reflevel))
     altlevel = setdiff(levels(samplesheet\$phenotype), reflevel)
     stopifnot(length(altlevel) == 1L)
+
+    # Validate the requested group sizes and sample alignment
+    stopifnot(ref.num > 0L,
+              alt.num > 0L,
+              nrow(samplesheet) == total.num,
+              ncol(countsframe) == total.num,
+              !anyNA(samplesheet\$sample),
+              !anyDuplicated(samplesheet\$sample),
+              !anyDuplicated(colnames(countsframe)),
+              identical(colnames(countsframe), as.character(samplesheet\$sample)),
+              sum(samplesheet\$phenotype == reflevel) == ref.num,
+              sum(samplesheet\$phenotype == altlevel) == alt.num)
 
     # Run edgeR for this dataset
     dds.edge = DGEList(counts=countsframe,group=samplesheet\$phenotype)
@@ -102,7 +117,9 @@ process EDGER_FULLSYNTH{
       n_background = n.background,
       metric_status = metric.status,
       replicate = replicate.id,
-      samplenum = samplenum,
+      refnum = ref.num,
+      altnum = alt.num,
+      totalnum = total.num,
       depth = depth
     )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)

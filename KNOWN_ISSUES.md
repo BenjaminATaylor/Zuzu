@@ -15,12 +15,6 @@ None currently.
 
 ## High
 
-### KI-011: Synthetic analysis ignores the alternative-group sample size
-
-[`DATA_FULLSYNTH`](modules/data_fullsynth.nf) accepts both `refnum` and `altnum`, but passes only `refnum` to compcodeR as `samples.per.cond`. Every synthetic dataset is therefore balanced even when the source groups and calculated breaks are unequal.
-
-Impact: synthetic benchmarks do not represent the requested unbalanced design and may contain a different total sample count from the source experiment.
-
 ### KI-012: SVC preprocessing leaks information across validation folds
 
 The SVC modules fit `StandardScaler` to the complete dataset before `RFECV` performs cross-validation.
@@ -105,7 +99,7 @@ Impact: SVC and the complete default branch combination have not yet been shown 
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting. The checks assert structural invariants and exact relationships among confusion counts and derived metrics, but they do not pin expected inferential results, exercise SVC, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting, including the preservation of exact unequal group sizes and sample-sheet/count-column alignment. The checks assert structural invariants and exact relationships among confusion counts and derived metrics, but they do not pin expected inferential results, exercise SVC, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
 Impact: major non-ML workflow breakage and metric inconsistencies are easier to detect, but SVC regressions, dependency-driven numerical changes, and failures outside the covered invariants can still go unnoticed.
 
@@ -236,6 +230,12 @@ Resolved 2026-08-10 alongside KI-005. The raw 20--80% agreement rule and its 100
 Resolved 2026-08-11. The active DESeq2, edgeR, and Wilcoxon quasi analyzers now run for every retained-anchor count. Rows with one to ten anchors retain their complete confusion counts and calculated metrics with a `low_anchor_count` status when background genes remain, rather than disappearing behind an arbitrary cutoff. When no anchors are retained, the analyzers still report calls, confusion counts, and FDP under a `no_anchors` status; power and Youden's index remain `NA` because there is no positive class. If no background genes remain, Youden's index is `NA` under `youden_undefined_no_background` regardless of anchor count.
 
 [`QUASI_PLOTS`](modules/quasi_plots.nf) distinguishes adequate, low, and empty anchor sets by point shape and states why power and Youden's index are absent for empty sets. The smoke validator enforces the count identities, formulas, bounds, and status precedence for zero-, low-, and adequate-anchor rows, rejects defined recovery metrics without anchors, and guards the active analyzers against reintroducing the old gate.
+
+### KI-011: Synthetic analysis ignored the alternative-group sample size
+
+Resolved 2026-08-11. [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now asks compcodeR to generate both conditions at the larger requested group size, then uses the replicate seed to select the exact requested number of reference and alternative samples. It verifies both group counts and sample-sheet/count-column alignment before emitting the dataset. The analyzers retain and validate `refnum`, `altnum`, and `totalnum`, while [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) groups results and labels sample sizes using both group counts.
+
+The opt-in synthetic smoke validator checks every generated sample-sheet/count-matrix pair directly. It requires the exact 11+9, 20+16, and 30+24 fixture designs at every depth and replicate, unique sample identifiers, aligned count headers, the expected task and pair frequencies, and consistent sample-size fields in the per-replicate and summary tables. The cold non-ML synthetic smoke run passed.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

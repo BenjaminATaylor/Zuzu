@@ -6,6 +6,7 @@ process SVC_FULLSYNTH_POSTPROCESS{
     tuple val(depth), 
           path(truedegs), //"trueDEGs.RData"
           val(refnum),
+          val(altnum),
           val(x),
           path(inframe),
           path(plotframe), // Included as input for ease of naming, but not used here
@@ -20,11 +21,16 @@ process SVC_FULLSYNTH_POSTPROCESS{
     library("tidyverse", quietly = TRUE)
     library("edgeR", quietly = TRUE)
 
-    samplenum = $refnum
+    ref.num = as.integer($refnum)
+    alt.num = as.integer($altnum)
+    total.num = ref.num + alt.num
     replicate.id = $x
     truedegs = get(load("$truedegs"))
     depth = $depth
     inframe = read.csv("$inframe", row.names = 1)
+
+    # Validate the requested group sizes
+    stopifnot(ref.num > 0L, alt.num > 0L)
 
     # Validate the fixed synthetic evaluation universe
     allgenes = row.names(inframe)
@@ -80,7 +86,9 @@ process SVC_FULLSYNTH_POSTPROCESS{
       n_background = n.background,
       metric_status = metric.status,
       replicate = replicate.id,
-      samplenum = samplenum,
+      refnum = ref.num,
+      altnum = alt.num,
+      totalnum = total.num,
       depth = depth
     )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)

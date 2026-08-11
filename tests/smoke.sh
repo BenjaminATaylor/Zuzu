@@ -703,6 +703,9 @@ verify_quasi_metrics() {
         if ! grep -q '"refnum".*"altnum".*"totalnum"' "$quasi_result"; then
             continue
         fi
+        if head -n 1 "$quasi_result" | grep -q '"depth"'; then
+            continue
+        fi
 
         metric_values="$(validate_quasi_metric_rows "$quasi_result" 1 0)" ||
             fail "invalid quasi metric row: $quasi_result"
@@ -733,7 +736,7 @@ verify_fullsynth_metrics() {
     expected_result_count=$((smoke_nperms * 3 * 3 * 3))
     expected_summary_count=$((3 * 3 * 3 * 3))
 
-    awk -F',' -v expected_rows="$expected_result_count" '
+    awk -F',' -v expected_rows="$expected_result_count" -v expected_replicates="$smoke_nperms" '
         function absolute(value) { return value < 0 ? -value : value }
         function is_integer(value) { return value ~ /^[0-9]+$/ }
         function is_number(value) {
@@ -744,7 +747,7 @@ verify_fullsynth_metrics() {
                 gsub(/^"|"$/, "", $i)
                 column[$i] = i
             }
-            split("method power FDP youden_index true_positives false_positives true_negatives false_negatives n_tested n_called n_truth n_background metric_status replicate samplenum depth", names, " ")
+            split("method power FDP youden_index true_positives false_positives true_negatives false_negatives n_tested n_called n_truth n_background metric_status replicate refnum altnum totalnum depth", names, " ")
             for (i in names) if (!(names[i] in column)) exit 2
             next
         }
@@ -765,19 +768,27 @@ verify_fullsynth_metrics() {
             n_background = $(column["n_background"])
             status = $(column["metric_status"])
             replicate = $(column["replicate"])
-            samplenum = $(column["samplenum"])
+            refnum = $(column["refnum"])
+            altnum = $(column["altnum"])
+            totalnum = $(column["totalnum"])
             depth = $(column["depth"])
 
             if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
             if (!is_number(power) || !is_number(FDP) || !is_number(youden) ||
-                !is_number(samplenum) || !is_number(depth)) exit 4
+                !is_number(depth)) exit 4
             if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
                 !is_integer(n_tested) || !is_integer(n_called) || !is_integer(n_truth) ||
-                !is_integer(n_background) || !is_integer(replicate)) exit 5
+                !is_integer(n_background) || !is_integer(replicate) ||
+                !is_integer(refnum) || !is_integer(altnum) || !is_integer(totalnum)) exit 5
             if (n_truth == 0 || n_background == 0 ||
                 n_tested != TP + FP + TN + FN || n_called != TP + FP ||
                 n_truth != TP + FN || n_background != FP + TN ||
-                n_tested != n_truth + n_background) exit 6
+                n_tested != n_truth + n_background || totalnum != refnum + altnum ||
+                replicate < 1 || replicate > expected_replicates) exit 6
+
+            pair = refnum ":" altnum
+            if (pair != "11:9" && pair != "20:16" && pair != "30:24") exit 7
+            if (depth != 100000 && depth != 1000000 && depth != 10000000) exit 8
 
             expected_status = n_called == 0 ? "no_calls" : "ok"
             expected_power = TP / n_truth
@@ -785,26 +796,41 @@ verify_fullsynth_metrics() {
             expected_youden = expected_power - (FP / n_background)
             if (status != expected_status || absolute(power - expected_power) > 1e-9 ||
                 absolute(FDP - expected_FDP) > 1e-9 ||
-                absolute(youden - expected_youden) > 1e-9) exit 7
+                absolute(youden - expected_youden) > 1e-9) exit 9
 
-            key = method SUBSEP replicate SUBSEP samplenum SUBSEP depth
-            if (seen[key]++) exit 8
-            dataset_key = replicate SUBSEP samplenum SUBSEP depth
+            key = method SUBSEP replicate SUBSEP refnum SUBSEP altnum SUBSEP depth
+            if (seen[key]++) exit 10
+            dataset_key = replicate SUBSEP refnum SUBSEP altnum SUBSEP depth
             if (dataset_key in dataset_tested &&
                 (dataset_tested[dataset_key] != n_tested ||
                  dataset_truth[dataset_key] != n_truth ||
-                 dataset_background[dataset_key] != n_background)) exit 9
+                 dataset_background[dataset_key] != n_background)) exit 11
             dataset_tested[dataset_key] = n_tested
             dataset_truth[dataset_key] = n_truth
             dataset_background[dataset_key] = n_background
             method_count[method] += 1
+            pair_count[pair] += 1
+            method_pair_count[method SUBSEP pair] += 1
         }
         END {
-            if (rows != expected_rows) exit 10
+            if (rows != expected_rows) exit 12
             expected_per_method = expected_rows / 3
             if (method_count["DESeq2"] != expected_per_method ||
                 method_count["edgeR"] != expected_per_method ||
-                method_count["Wilcoxon"] != expected_per_method) exit 11
+                method_count["Wilcoxon"] != expected_per_method) exit 13
+
+            expected_per_pair = expected_rows / 3
+            expected_per_method_pair = expected_rows / 9
+            split("11:9 20:16 30:24", expected_pairs, " ")
+            split("DESeq2 edgeR Wilcoxon", expected_methods, " ")
+            for (i in expected_pairs) {
+                pair = expected_pairs[i]
+                if (pair_count[pair] != expected_per_pair) exit 14
+                for (j in expected_methods) {
+                    method = expected_methods[j]
+                    if (method_pair_count[method SUBSEP pair] != expected_per_method_pair) exit 15
+                }
+            }
         }
     ' "$output_dir/synth_results.csv" || fail "invalid synthetic per-replicate metrics"
 
@@ -818,7 +844,7 @@ verify_fullsynth_metrics() {
                 gsub(/^"|"$/, "", $i)
                 column[$i] = i
             }
-            split("method samplenum depth variable mean n_valid n_total n_no_calls", names, " ")
+            split("method refnum altnum totalnum depth variable mean n_valid n_total n_no_calls", names, " ")
             for (i in names) if (!(names[i] in column)) exit 2
             next
         }
@@ -826,7 +852,9 @@ verify_fullsynth_metrics() {
             rows += 1
             for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
             method = $(column["method"])
-            samplenum = $(column["samplenum"])
+            refnum = $(column["refnum"])
+            altnum = $(column["altnum"])
+            totalnum = $(column["totalnum"])
             depth = $(column["depth"])
             variable = $(column["variable"])
             mean = $(column["mean"])
@@ -837,22 +865,149 @@ verify_fullsynth_metrics() {
             if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
             if (variable != "power" && variable != "FDP" && variable != "youden_index") exit 4
             if (!is_number(mean) || !is_integer(n_valid) || !is_integer(n_total) ||
-                !is_integer(n_no_calls)) exit 5
+                !is_integer(n_no_calls) || !is_integer(refnum) || !is_integer(altnum) ||
+                !is_integer(totalnum) || !is_number(depth)) exit 5
             if (n_valid != expected_replicates || n_total != expected_replicates ||
-                n_no_calls > n_total) exit 6
+                n_no_calls > n_total || totalnum != refnum + altnum) exit 6
             if ((variable == "power" || variable == "FDP") && (mean < 0 || mean > 1)) exit 7
             if (variable == "youden_index" && (mean < -1 || mean > 1)) exit 8
 
-            key = method SUBSEP samplenum SUBSEP depth SUBSEP variable
-            if (seen[key]++) exit 9
-            group_key = method SUBSEP samplenum SUBSEP depth
-            if (group_key in group_no_calls && group_no_calls[group_key] != n_no_calls) exit 10
+            pair = refnum ":" altnum
+            if (pair != "11:9" && pair != "20:16" && pair != "30:24") exit 9
+            if (depth != 100000 && depth != 1000000 && depth != 10000000) exit 10
+
+            key = method SUBSEP refnum SUBSEP altnum SUBSEP depth SUBSEP variable
+            if (seen[key]++) exit 11
+            group_key = method SUBSEP refnum SUBSEP altnum SUBSEP depth
+            if (group_key in group_no_calls && group_no_calls[group_key] != n_no_calls) exit 12
             group_no_calls[group_key] = n_no_calls
+            pair_count[pair] += 1
+            method_pair_count[method SUBSEP pair] += 1
         }
         END {
-            if (rows != expected_rows) exit 11
+            if (rows != expected_rows) exit 13
+
+            expected_per_pair = expected_rows / 3
+            expected_per_method_pair = expected_rows / 9
+            split("11:9 20:16 30:24", expected_pairs, " ")
+            split("DESeq2 edgeR Wilcoxon", expected_methods, " ")
+            for (i in expected_pairs) {
+                pair = expected_pairs[i]
+                if (pair_count[pair] != expected_per_pair) exit 14
+                for (j in expected_methods) {
+                    method = expected_methods[j]
+                    if (method_pair_count[method SUBSEP pair] != expected_per_method_pair) exit 15
+                }
+            }
         }
     ' "$output_dir/synth_summary.csv" || fail "invalid synthetic metric summary"
+}
+
+# Verify that each synthetic dataset retains the exact requested group sizes
+# and that its count columns remain aligned with its sample sheet.
+verify_fullsynth_datasets() {
+    expected_dataset_count=$((smoke_nperms * 3 * 3))
+    expected_pair_count=$((smoke_nperms * 3))
+    dataset_count=0
+    small_pair_count=0
+    middle_pair_count=0
+    full_pair_count=0
+
+    while IFS= read -r synth_sheet; do
+        synth_dir="$(dirname "$synth_sheet")"
+        synth_counts="$synth_dir/synthcounts.csv"
+        [[ -f "$synth_counts" ]] || fail "synthetic sample sheet has no matching count matrix: $synth_sheet"
+
+        dataset_sizes="$(awk -F',' -v reflevel="$smoke_reflevel" '
+            function clean(value) {
+                sub(/\r$/, "", value)
+                sub(/^"/, "", value)
+                sub(/"$/, "", value)
+                return value
+            }
+            FILENAME == ARGV[1] {
+                if (FNR == 1) {
+                    if (NF != 2 || clean($1) != "sample" || clean($2) != "phenotype") exit 2
+                    sheet_header = 1
+                    next
+                }
+
+                sample = clean($1)
+                phenotype = clean($2)
+                if (NF != 2 || sample == "" || phenotype == "") exit 3
+                if (sample_seen[sample]++) exit 4
+                sheet_sample[++sample_count] = sample
+                if (phenotype == reflevel) {
+                    ref_count += 1
+                } else {
+                    if (altlevel == "") altlevel = phenotype
+                    if (phenotype != altlevel) exit 5
+                    alt_count += 1
+                }
+                next
+            }
+            FILENAME == ARGV[2] {
+                if (FNR == 1) {
+                    if (NF != sample_count + 1 || clean($1) != "") exit 6
+                    for (i = 2; i <= NF; i++) {
+                        if (clean($i) != sheet_sample[i - 1]) exit 7
+                    }
+                    counts_header = 1
+                    next
+                }
+
+                gene = clean($1)
+                if (NF != sample_count + 1 || gene == "" || gene_seen[gene]++) exit 8
+                gene_count += 1
+            }
+            END {
+                if (!sheet_header || !counts_header || sample_count == 0 || gene_count == 0 ||
+                    ref_count == 0 || alt_count == 0 || ref_count + alt_count != sample_count) exit 9
+                print ref_count, alt_count, sample_count
+            }
+        ' "$synth_sheet" "$synth_counts")" ||
+            fail "invalid synthetic sample/count pair: $synth_dir"
+
+        read -r observed_ref observed_alt observed_total <<< "$dataset_sizes"
+        [[ "$observed_total" -eq $((observed_ref + observed_alt)) ]] ||
+            fail "inconsistent synthetic total in $synth_dir"
+        ((dataset_count += 1))
+        case "$observed_ref:$observed_alt" in
+            11:9) ((small_pair_count += 1)) ;;
+            20:16) ((middle_pair_count += 1)) ;;
+            30:24) ((full_pair_count += 1)) ;;
+            *) fail "unexpected synthetic sample-size pair: $observed_ref ref, $observed_alt alt" ;;
+        esac
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'synthsheet.csv' -print | sort)
+
+    synth_count_count="$(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'synthcounts.csv' -print | awk 'END { print NR + 0 }')"
+    [[ "$dataset_count" -eq "$expected_dataset_count" ]] ||
+        fail "expected $expected_dataset_count generated synthetic datasets, found $dataset_count"
+    [[ "$synth_count_count" -eq "$expected_dataset_count" ]] ||
+        fail "expected $expected_dataset_count generated synthetic count matrices, found $synth_count_count"
+    [[ "$small_pair_count" -eq "$expected_pair_count" ]] ||
+        fail "expected $expected_pair_count synthetic datasets for 11 ref + 9 alt, found $small_pair_count"
+    [[ "$middle_pair_count" -eq "$expected_pair_count" ]] ||
+        fail "expected $expected_pair_count synthetic datasets for 20 ref + 16 alt, found $middle_pair_count"
+    [[ "$full_pair_count" -eq "$expected_pair_count" ]] ||
+        fail "expected $expected_pair_count synthetic datasets for 30 ref + 24 alt, found $full_pair_count"
+
+    completed_tasks="$(awk -F '\t' '
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "name") name_column = i
+                if ($i == "status") status_column = i
+            }
+            if (!name_column || !status_column) exit 2
+            next
+        }
+        index($(name_column), "DATA_FULLSYNTH (") && $(status_column) == "COMPLETED" {
+            matches += 1
+        }
+        END { print matches + 0 }
+    ' "$log_dir/trace.tsv")" || fail "could not parse synthetic generation tasks from the trace"
+    [[ "$completed_tasks" -eq "$expected_dataset_count" ]] ||
+        fail "expected $expected_dataset_count completed DATA_FULLSYNTH tasks, found $completed_tasks"
 }
 
 verify_quasi_trace_keys() {
@@ -934,6 +1089,7 @@ verify_quasi_trace_keys
 verify_quasi_anchor_contract
 verify_quasi_metrics
 if [[ "$smoke_synth" == 1 ]]; then
+    verify_fullsynth_datasets
     verify_fullsynth_metrics
 fi
 

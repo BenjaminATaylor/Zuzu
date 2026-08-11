@@ -20,9 +20,45 @@ process FULLSYNTH_PLOTS {
     library("reshape2", quietly = TRUE)
     library("viridis")
 
+    fullsynth.columns = c(
+        "method", "power", "FDP", "youden_index",
+        "true_positives", "false_positives", "true_negatives", "false_negatives",
+        "n_tested", "n_called", "n_truth", "n_background", "metric_status",
+        "replicate", "refnum", "altnum", "totalnum", "depth"
+    )
+
+    # Read each method only when it follows the common synthetic result schema
     read_fullsynths = function(dir, label){
-        lapply(list.files(dir, full.names = TRUE), read.csv) %>%
-            bind_rows() %>%
+        files = list.files(dir, full.names = TRUE)
+        if(length(files) == 0){
+            stop(sprintf("No %s synthetic result files were supplied", label))
+        }
+
+        frames = lapply(files, function(file){
+            frame = read.csv(file, check.names = FALSE)
+            missing.columns = setdiff(fullsynth.columns, names(frame))
+            unexpected.columns = setdiff(names(frame), fullsynth.columns)
+            if(length(missing.columns) > 0 || length(unexpected.columns) > 0){
+                stop(sprintf(
+                    paste0(
+                        "%s synthetic result %s does not match the common schema; ",
+                        "missing: %s; unexpected: %s"
+                    ),
+                    label,
+                    basename(file),
+                    if(length(missing.columns) == 0) "none" else paste(missing.columns, collapse = ", "),
+                    if(length(unexpected.columns) == 0) "none" else paste(unexpected.columns, collapse = ", ")
+                ))
+            }
+            frame = frame[,fullsynth.columns,drop=FALSE]
+            if(any(frame\$refnum < 1 | frame\$altnum < 1 |
+                   frame\$totalnum != frame\$refnum + frame\$altnum)){
+                stop(sprintf("%s synthetic result %s has invalid group sizes", label, basename(file)))
+            }
+            frame
+        })
+
+        bind_rows(frames) %>%
             mutate(method = label)
     }
 
@@ -44,18 +80,18 @@ process FULLSYNTH_PLOTS {
     }
 
     fullsynth.results = fullsynth.results %>%
-        arrange(method, replicate, samplenum, depth)
+        arrange(method, replicate, totalnum, refnum, altnum, depth)
     write.csv(fullsynth.results, "synth_results.csv", row.names = FALSE)
 
     # Reshape and summarise benchmark metrics across replicates
     fullsynth.long = melt(
         fullsynth.results,
-        id.vars = c("method", "replicate", "samplenum", "depth", "metric_status"),
+        id.vars = c("method", "replicate", "refnum", "altnum", "totalnum", "depth", "metric_status"),
         measure.vars = c("power", "FDP", "youden_index")
     )
 
     fullsynth.summary = fullsynth.long %>%
-        group_by(method, samplenum, depth, variable) %>%
+        group_by(method, refnum, altnum, totalnum, depth, variable) %>%
         summarize(
             mean = if(any(is.finite(value))){
                 mean(value[is.finite(value)])
@@ -69,9 +105,19 @@ process FULLSYNTH_PLOTS {
         )
     write.csv(fullsynth.summary, "synth_summary.csv", row.names = FALSE)
 
+    # Label and order each requested reference/alternative sample-size pair
+    sample.size.levels = fullsynth.summary %>%
+        distinct(refnum, altnum, totalnum) %>%
+        arrange(totalnum, refnum, altnum) %>%
+        transmute(label = paste0(refnum, " ref + ", altnum, " alt")) %>%
+        pull(label)
+
     gg.synth.input = fullsynth.summary %>%
         mutate(mean      = signif(mean, 3),
-               samplenum = as.factor(samplenum),
+               sample_size = factor(
+                   paste0(refnum, " ref + ", altnum, " alt"),
+                   levels = sample.size.levels
+               ),
                depth     = as.factor(depth))
 
     # Take FDP as inverse so higher values are better (matching power and
@@ -90,12 +136,12 @@ process FULLSYNTH_PLOTS {
             paste0(mean, "\n(n=", n_valid, "/", n_total, ")")
         ))
 
-    gg.synth = ggplot(gg.synth.input, aes(x = depth, y = samplenum)) +
+    gg.synth = ggplot(gg.synth.input, aes(x = depth, y = sample_size)) +
         geom_tile(aes(fill = mean), color = "gray20", size = .75, width = 1, height = 1) +
         geom_label(aes(label = plot_label), color = "white",
                    lineheight = 0.75, size = 3.5, alpha = 0.7, fill = "gray10") +
         scale_x_discrete("Sequencing depth",  expand = c(0, 0)) +
-        scale_y_discrete("Replicates per treatment", expand = c(0, 0)) +
+        scale_y_discrete("Sample size (reference + alternative)", expand = c(0, 0)) +
         scale_fill_viridis(option = "plasma", limits = c(-1, 1), expand = c(0, 0)) +
         facet_grid(variable ~ method) +
         theme_bw() +
