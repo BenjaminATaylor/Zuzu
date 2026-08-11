@@ -10,6 +10,8 @@ process FULLSYNTH_PLOTS {
 
     output:
     path "synth_plot.pdf"
+    path "synth_results.csv"
+    path "synth_summary.csv"
 
     script:
     """
@@ -21,8 +23,7 @@ process FULLSYNTH_PLOTS {
     read_fullsynths = function(dir, label){
         lapply(list.files(dir, full.names = TRUE), read.csv) %>%
             bind_rows() %>%
-            mutate(method = label) %>%
-            melt(id.vars = c("method", "samplenum", "depth"))
+            mutate(method = label)
     }
 
     deseq.synth.input  = read_fullsynths("deseq",  "DESeq2")
@@ -31,22 +32,45 @@ process FULLSYNTH_PLOTS {
 
     if("$params.mlstep" == "true"){
         svc.synth.input = read_fullsynths("svc", "SVC")
-        gg.synth.input = rbind(deseq.synth.input,
-                               edger.synth.input,
-                               wilcox.synth.input,
-                               svc.synth.input)
+        fullsynth.results = bind_rows(deseq.synth.input,
+                                      edger.synth.input,
+                                      wilcox.synth.input,
+                                      svc.synth.input)
     } else {
-        gg.synth.input = rbind(deseq.synth.input,
-                               edger.synth.input,
-                               wilcox.synth.input)
+        fullsynth.results = bind_rows(deseq.synth.input,
+                                      edger.synth.input,
+                                      wilcox.synth.input)
     }
 
-    gg.synth.input = gg.synth.input %>%
-        mutate(samplenum = as.factor(samplenum),
-               depth     = as.factor(depth)) %>%
+    fullsynth.results = fullsynth.results %>%
+        arrange(method, replicate, samplenum, depth)
+    write.csv(fullsynth.results, "synth_results.csv", row.names = FALSE)
+
+    fullsynth.long = melt(
+        fullsynth.results,
+        id.vars = c("method", "replicate", "samplenum", "depth", "metric_status"),
+        measure.vars = c("power", "FDP", "youden_index")
+    )
+
+    fullsynth.summary = fullsynth.long %>%
         group_by(method, samplenum, depth, variable) %>%
-        summarize(mean = mean(value)) %>%
-        mutate(mean = signif(mean, 3))
+        summarize(
+            mean = if(any(is.finite(value))){
+                mean(value[is.finite(value)])
+            } else {
+                NA_real_
+            },
+            n_valid = sum(is.finite(value)),
+            n_total = n(),
+            n_no_calls = sum(metric_status == "no_calls"),
+            .groups = "drop"
+        )
+    write.csv(fullsynth.summary, "synth_summary.csv", row.names = FALSE)
+
+    gg.synth.input = fullsynth.summary %>%
+        mutate(mean      = signif(mean, 3),
+               samplenum = as.factor(samplenum),
+               depth     = as.factor(depth))
 
     # Take FDP as inverse so higher values are better (matching power and
     # Youden's index).
@@ -57,10 +81,16 @@ process FULLSYNTH_PLOTS {
         "1-FDP" = "FDP",
         "Youden's index" = "youden_index"
     )
+    gg.synth.input = gg.synth.input %>%
+        mutate(plot_label = ifelse(
+            is.na(mean),
+            paste0("NA\n(n=0/", n_total, ")"),
+            paste0(mean, "\n(n=", n_valid, "/", n_total, ")")
+        ))
 
     gg.synth = ggplot(gg.synth.input, aes(x = depth, y = samplenum)) +
         geom_tile(aes(fill = mean), color = "gray20", size = .75, width = 1, height = 1) +
-        geom_label(aes(label = mean), color = "white",
+        geom_label(aes(label = plot_label), color = "white",
                    lineheight = 0.75, size = 3.5, alpha = 0.7, fill = "gray10") +
         scale_x_discrete("Sequencing depth",  expand = c(0, 0)) +
         scale_y_discrete("Replicates per treatment", expand = c(0, 0)) +

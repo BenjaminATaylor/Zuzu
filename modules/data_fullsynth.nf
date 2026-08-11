@@ -63,6 +63,31 @@ process DATA_FULLSYNTH{
     # extract names of true DEGs
     truedegs = row.names(subset(synthdata@variable.annotations, differential.expression == 1))
 
+    # Check that the synthetic truth universe is valid
+    synthgenes = row.names(synthdata.counts)
+    if(length(synthgenes) == 0){
+      stop("Synthetic benchmark contains no genes after compcodeR filtering")
+    }
+    if(anyDuplicated(synthgenes)){
+      stop("Synthetic benchmark contains duplicate gene identifiers")
+    }
+    if(anyDuplicated(truedegs)){
+      stop("Synthetic truth set contains duplicate gene identifiers")
+    }
+    missing.truth = setdiff(truedegs, synthgenes)
+    if(length(missing.truth) > 0){
+      stop(sprintf(
+        "Synthetic truth set contains %d genes absent from the generated count matrix",
+        length(missing.truth)
+      ))
+    }
+    if(length(truedegs) == 0){
+      stop("Synthetic benchmark contains no true DEGs after compcodeR filtering")
+    }
+    if(length(truedegs) == length(synthgenes)){
+      stop("Synthetic benchmark contains no background genes after compcodeR filtering")
+    }
+
     # save outputs
     save(truedegs, file="trueDEGs.RData")
     write.csv(synthdata.metadata, file="synthsheet.csv")

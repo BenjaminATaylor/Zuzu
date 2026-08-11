@@ -20,15 +20,29 @@ process WILCOXON_FULLSYNTH{
     samplesheet = read.csv("$samplesheet")
     countsframe = read.csv("$countsframe", row.names = 1, check.names = F)
     samplenum = $refnum
+    replicate.id = $x
     truedegs = get(load("$truedegs"))
     depth = $depth
     reflevel = "$params.reflevel"
+
+    allgenes = row.names(countsframe)
+    if(anyDuplicated(allgenes)) stop("Synthetic count matrix contains duplicate gene identifiers")
+    if(anyDuplicated(truedegs)) stop("Synthetic truth set contains duplicate gene identifiers")
+    missing.truth = setdiff(truedegs, allgenes)
+    if(length(missing.truth) > 0){
+      stop(sprintf("Synthetic truth set contains %d untested genes", length(missing.truth)))
+    }
+    n.tested = length(allgenes)
+    n.truth = length(truedegs)
+    n.background = n.tested - n.truth
+    if(n.truth == 0) stop("Synthetic benchmark contains no true DEGs")
+    if(n.background == 0) stop("Synthetic benchmark contains no background genes")
 
     #Wilcox analysis for this dataset
     countsframe.dge = DGEList(counts=countsframe,group=samplesheet\$phenotype)
     countsframe.dge = calcNormFactors(countsframe.dge,method="TMM")
     countsframe.dge = cpm(countsframe.dge) %>% as.data.frame()
-    allgenes = row.names(countsframe.dge)
+    stopifnot(identical(row.names(countsframe.dge), allgenes))
 
     # Split data into ref and alt counts
     refcounts = select(countsframe.dge, subset(samplesheet, phenotype == reflevel)\$sample)
@@ -47,23 +61,47 @@ process WILCOXON_FULLSYNTH{
 
     ## Generate metrics 
 
-    # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
+    # Classify every gene in the fixed synthetic truth universe.
     degs = row.names(subset(wilcox.out,padj<0.05))
-    power = length(which(truedegs %in% degs))/length(truedegs)
-
-    # 2. FDP: the proportion of all DEGs that are false positives
-    FDP = 1-(length(which(degs %in% truedegs))/length(degs))
-
-    # 3. Youden's index at the DEG threshold
-    allgenes = row.names(wilcox.out)
     truth = allgenes %in% truedegs
     called = allgenes %in% degs
-    sensitivity = sum(called & truth) / sum(truth)
-    false_positive_rate = sum(called & !truth) / sum(!truth)
-    youden_index = sensitivity - false_positive_rate
+    true.positives = sum(called & truth)
+    false.positives = sum(called & !truth)
+    true.negatives = sum(!called & !truth)
+    false.negatives = sum(!called & truth)
+    n.called = sum(called)
+
+    # 1. Power: the proportion of true DEGs identified as DEGs in this comparison
+    power = true.positives / n.truth
+
+    # 2. FDP: the proportion of all identified DEGs that are false positives
+    # FDP is defined as zero if no DEGs are identified
+    FDP = if(n.called == 0) 0 else false.positives / n.called
+
+    # 3. Youden's index: the true-positive rate minus the false-positive rate at the DEG threshold
+    youden_index = (true.positives / n.truth) -
+                   (false.positives / n.background)
+    metric.status = if(n.called == 0) "no_calls" else "ok"
 
     # Save outputs
-    outframe = data.frame(method = "Wilcoxon", power = power, FDP = FDP, youden_index = youden_index, samplenum = samplenum, depth = depth)
+    outframe = data.frame(
+      method = "Wilcoxon",
+      power = power,
+      FDP = FDP,
+      youden_index = youden_index,
+      true_positives = true.positives,
+      false_positives = false.positives,
+      true_negatives = true.negatives,
+      false_negatives = false.negatives,
+      n_tested = n.tested,
+      n_called = n.called,
+      n_truth = n.truth,
+      n_background = n.background,
+      metric_status = metric.status,
+      replicate = replicate.id,
+      samplenum = samplenum,
+      depth = depth
+    )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
 
     """

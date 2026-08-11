@@ -15,6 +15,7 @@ process SVC_FULLSYNTH{
     tuple val(depth), 
           path(truedegs),
           val(refnum),
+          val(x),
           path("svc_table.csv"),
           path("svc_fullsynth_fs_*.png"),
           path("rfecv.pickle")
@@ -39,6 +40,7 @@ process SVC_FULLSYNTH{
     # Reading the Dataset
     count_data=pd.read_table('$countsframe',sep=',',index_col=0) 
     samplesheet=pd.read_csv('$samplesheet')
+    all_gene_names = count_data.index.to_list()
 
     # Keep dataset small while testing
     pare = True if ('$params.pareml' == "true") else False
@@ -92,7 +94,9 @@ process SVC_FULLSYNTH{
     DEGnames = count_data.axes[1][DEG_indices].tolist()
 
     # Write DEG output to table
-    allgenes=pd.DataFrame(count_data.axes[1].to_list())
+    # Preserve the complete synthetic gene universe even in pare mode. Genes
+    # omitted from the debug fit remain valid uncalled features in the output.
+    allgenes=pd.DataFrame(all_gene_names)
     genescores = allgenes.isin(DEGnames).astype('int')
     outframe = pd.concat([allgenes,genescores], axis=1)
     outframe.columns = ['gene', 'DEGstatus']

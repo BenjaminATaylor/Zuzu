@@ -8,6 +8,7 @@ source_sheet="$repo_dir/input/synthtest/synthsheet.csv"
 source_counts="$repo_dir/input/synthtest/synthcounts.csv"
 plot_dir="$script_dir/.smoke-plots"
 smoke_nperms="${SMOKE_NPERMS:-1}"
+smoke_synth="${SMOKE_SYNTH:-0}"
 smoke_max_permute_correlation="0.6"
 
 fail() {
@@ -20,6 +21,7 @@ fail() {
 [[ -f "$source_sheet" ]] || fail "fixture sample sheet is missing"
 [[ -f "$source_counts" ]] || fail "fixture count matrix is missing"
 [[ "$smoke_nperms" =~ ^[1-9][0-9]*$ ]] || fail "SMOKE_NPERMS must be a positive integer"
+[[ "$smoke_synth" =~ ^[01]$ ]] || fail "SMOKE_SYNTH must be either 0 or 1"
 
 command -v nextflow >/dev/null || fail "Nextflow is not installed"
 command -v docker >/dev/null || fail "Docker is not installed"
@@ -150,6 +152,11 @@ cp "$source_counts" "$snapshot_dir/source_counts.csv"
 cp "$smoke_sheet" "$snapshot_dir/smoke_sheet.csv"
 cp "$smoke_counts" "$snapshot_dir/smoke_counts.tsv"
 
+synth_args=(--synthstep false)
+if [[ "$smoke_synth" == 1 ]]; then
+    synth_args=(--synthstep true --synthdeg_pct 0.1)
+fi
+
 # The relaxed test-only anchor threshold makes the compact fixture exercise the
 # quasi recovery calculations rather than only their too-few-anchors fallback.
 (
@@ -165,7 +172,7 @@ cp "$smoke_counts" "$snapshot_dir/smoke_counts.tsv"
         --outdir "$output_dir" \
         --nperms "$smoke_nperms" \
         --truecutoff 0.05 \
-        --synthstep false \
+        "${synth_args[@]}" \
         --mlstep false \
         --pareml true \
         -w "$work_dir" \
@@ -520,7 +527,113 @@ verify_permutation_trace_keys() {
     done
 }
 
-verify_quasi_sample_sizes() {
+validate_quasi_metric_rows() {
+    metrics_file="$1"
+    expected_rows="$2"
+    require_method="$3"
+
+    awk -F',' -v expected_rows="$expected_rows" -v require_method="$require_method" '
+        function absolute(value) {
+            return value < 0 ? -value : value
+        }
+        function is_integer(value) {
+            return value ~ /^[0-9]+$/
+        }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                gsub(/^"|"$/, "", $i)
+                column[$i] = i
+            }
+            required["power"] = 1
+            required["FDP"] = 1
+            required["youden_index"] = 1
+            required["true_positives"] = 1
+            required["false_positives"] = 1
+            required["true_negatives"] = 1
+            required["false_negatives"] = 1
+            required["n_tested"] = 1
+            required["n_called"] = 1
+            required["n_truth"] = 1
+            required["n_background"] = 1
+            required["metric_status"] = 1
+            required["replicate"] = 1
+            required["refnum"] = 1
+            required["altnum"] = 1
+            required["totalnum"] = 1
+            for (name in required) {
+                if (!(name in column)) exit 2
+            }
+            if (("normAUC" in column) || (require_method && !("method" in column))) exit 3
+            next
+        }
+        {
+            data_rows += 1
+            for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
+
+            power = $(column["power"])
+            FDP = $(column["FDP"])
+            youden = $(column["youden_index"])
+            TP = $(column["true_positives"])
+            FP = $(column["false_positives"])
+            TN = $(column["true_negatives"])
+            FN = $(column["false_negatives"])
+            n_tested = $(column["n_tested"])
+            n_called = $(column["n_called"])
+            n_truth = $(column["n_truth"])
+            n_background = $(column["n_background"])
+            status = $(column["metric_status"])
+            replicate = $(column["replicate"])
+            refnum = $(column["refnum"])
+            altnum = $(column["altnum"])
+            totalnum = $(column["totalnum"])
+
+            if (!is_number(power) || !is_number(FDP) || !is_number(youden)) exit 4
+            if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
+                !is_integer(n_tested) || !is_integer(n_called) || !is_integer(n_truth) ||
+                !is_integer(n_background) || !is_integer(replicate) || !is_integer(refnum) ||
+                !is_integer(altnum) || !is_integer(totalnum)) exit 5
+            if (n_truth == 0 || n_background == 0) exit 6
+            if (n_tested != TP + FP + TN + FN ||
+                n_called != TP + FP || n_truth != TP + FN ||
+                n_background != FP + TN || n_tested != n_truth + n_background) exit 7
+            if (totalnum != refnum + altnum) exit 8
+
+            expected_status = n_called == 0 ? "no_calls" : "ok"
+            if (status != expected_status) exit 9
+            expected_power = TP / n_truth
+            expected_FDP = n_called == 0 ? 0 : FP / n_called
+            expected_youden = expected_power - (FP / n_background)
+            if (absolute(power - expected_power) > 1e-9 ||
+                absolute(FDP - expected_FDP) > 1e-9 ||
+                absolute(youden - expected_youden) > 1e-9) exit 10
+            if (power < 0 || power > 1 || FDP < 0 || FDP > 1 ||
+                youden < -1 || youden > 1) exit 11
+
+            method = require_method ? $(column["method"]) : ""
+            if (require_method) {
+                if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 12
+                key = method SUBSEP replicate SUBSEP refnum SUBSEP altnum
+                if (seen[key]++) exit 13
+                method_count[method] += 1
+            }
+            printf "%d %d %s\n", refnum, altnum, method
+        }
+        END {
+            if (data_rows != expected_rows) exit 14
+            if (require_method) {
+                expected_per_method = expected_rows / 3
+                if (method_count["DESeq2"] != expected_per_method ||
+                    method_count["edgeR"] != expected_per_method ||
+                    method_count["Wilcoxon"] != expected_per_method) exit 15
+            }
+        }
+    ' "$metrics_file"
+}
+
+verify_quasi_metrics() {
     expected_result_count=$((smoke_nperms * 3 * 3))
     expected_pair_count=$((smoke_nperms * 3))
     quasi_result_count=0
@@ -533,47 +646,9 @@ verify_quasi_sample_sizes() {
             continue
         fi
 
-        size_values="$(awk -F',' '
-            NR == 1 {
-                for (i = 1; i <= NF; i++) {
-                    gsub(/^"|"$/, "", $i)
-                    column[$i] = i
-                }
-                if (!("refnum" in column) || !("altnum" in column) || !("totalnum" in column) ||
-                    !("youden_index" in column) || ("normAUC" in column)) {
-                    exit 2
-                }
-                next
-            }
-            NR == 2 {
-                for (i = 1; i <= NF; i++) {
-                    gsub(/^"|"$/, "", $i)
-                }
-                refnum = $(column["refnum"])
-                altnum = $(column["altnum"])
-                totalnum = $(column["totalnum"])
-                youden_index = $(column["youden_index"])
-                if (refnum !~ /^[0-9]+$/ || altnum !~ /^[0-9]+$/ || totalnum !~ /^[0-9]+$/) {
-                    exit 3
-                }
-                if (totalnum != refnum + altnum) {
-                    exit 4
-                }
-                if (youden_index !~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/ ||
-                    youden_index < -1 || youden_index > 1) {
-                    exit 6
-                }
-                printf "%d %d %d %.17g\n", refnum, altnum, totalnum, youden_index
-                next
-            }
-            END {
-                if (NR != 2) {
-                    exit 5
-                }
-            }
-        ' "$quasi_result")" || fail "invalid quasi result metadata: $quasi_result"
-
-        read -r observed_ref observed_alt _ <<< "$size_values"
+        metric_values="$(validate_quasi_metric_rows "$quasi_result" 1 0)" ||
+            fail "invalid quasi metric row: $quasi_result"
+        read -r observed_ref observed_alt _ <<< "$metric_values"
         ((quasi_result_count += 1))
         case "$observed_ref:$observed_alt" in
             11:9) ((small_pair_count += 1)) ;;
@@ -591,6 +666,135 @@ verify_quasi_sample_sizes() {
         fail "expected $expected_pair_count quasi results for 20 ref + 16 alt, found $middle_pair_count"
     [[ "$full_pair_count" -eq "$expected_pair_count" ]] ||
         fail "expected $expected_pair_count quasi results for 30 ref + 24 alt, found $full_pair_count"
+
+    validate_quasi_metric_rows "$output_dir/quasi_results.csv" "$expected_result_count" 1 >/dev/null ||
+        fail "invalid combined quasi metrics: $output_dir/quasi_results.csv"
+}
+
+verify_fullsynth_metrics() {
+    expected_result_count=$((smoke_nperms * 3 * 3 * 3))
+    expected_summary_count=$((3 * 3 * 3 * 3))
+
+    awk -F',' -v expected_rows="$expected_result_count" '
+        function absolute(value) { return value < 0 ? -value : value }
+        function is_integer(value) { return value ~ /^[0-9]+$/ }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                gsub(/^"|"$/, "", $i)
+                column[$i] = i
+            }
+            split("method power FDP youden_index true_positives false_positives true_negatives false_negatives n_tested n_called n_truth n_background metric_status replicate samplenum depth", names, " ")
+            for (i in names) if (!(names[i] in column)) exit 2
+            next
+        }
+        {
+            rows += 1
+            for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
+            method = $(column["method"])
+            power = $(column["power"])
+            FDP = $(column["FDP"])
+            youden = $(column["youden_index"])
+            TP = $(column["true_positives"])
+            FP = $(column["false_positives"])
+            TN = $(column["true_negatives"])
+            FN = $(column["false_negatives"])
+            n_tested = $(column["n_tested"])
+            n_called = $(column["n_called"])
+            n_truth = $(column["n_truth"])
+            n_background = $(column["n_background"])
+            status = $(column["metric_status"])
+            replicate = $(column["replicate"])
+            samplenum = $(column["samplenum"])
+            depth = $(column["depth"])
+
+            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
+            if (!is_number(power) || !is_number(FDP) || !is_number(youden) ||
+                !is_number(samplenum) || !is_number(depth)) exit 4
+            if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
+                !is_integer(n_tested) || !is_integer(n_called) || !is_integer(n_truth) ||
+                !is_integer(n_background) || !is_integer(replicate)) exit 5
+            if (n_truth == 0 || n_background == 0 ||
+                n_tested != TP + FP + TN + FN || n_called != TP + FP ||
+                n_truth != TP + FN || n_background != FP + TN ||
+                n_tested != n_truth + n_background) exit 6
+
+            expected_status = n_called == 0 ? "no_calls" : "ok"
+            expected_power = TP / n_truth
+            expected_FDP = n_called == 0 ? 0 : FP / n_called
+            expected_youden = expected_power - (FP / n_background)
+            if (status != expected_status || absolute(power - expected_power) > 1e-9 ||
+                absolute(FDP - expected_FDP) > 1e-9 ||
+                absolute(youden - expected_youden) > 1e-9) exit 7
+
+            key = method SUBSEP replicate SUBSEP samplenum SUBSEP depth
+            if (seen[key]++) exit 8
+            dataset_key = replicate SUBSEP samplenum SUBSEP depth
+            if (dataset_key in dataset_tested &&
+                (dataset_tested[dataset_key] != n_tested ||
+                 dataset_truth[dataset_key] != n_truth ||
+                 dataset_background[dataset_key] != n_background)) exit 9
+            dataset_tested[dataset_key] = n_tested
+            dataset_truth[dataset_key] = n_truth
+            dataset_background[dataset_key] = n_background
+            method_count[method] += 1
+        }
+        END {
+            if (rows != expected_rows) exit 10
+            expected_per_method = expected_rows / 3
+            if (method_count["DESeq2"] != expected_per_method ||
+                method_count["edgeR"] != expected_per_method ||
+                method_count["Wilcoxon"] != expected_per_method) exit 11
+        }
+    ' "$output_dir/synth_results.csv" || fail "invalid synthetic per-replicate metrics"
+
+    awk -F',' -v expected_rows="$expected_summary_count" -v expected_replicates="$smoke_nperms" '
+        function is_integer(value) { return value ~ /^[0-9]+$/ }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                gsub(/^"|"$/, "", $i)
+                column[$i] = i
+            }
+            split("method samplenum depth variable mean n_valid n_total n_no_calls", names, " ")
+            for (i in names) if (!(names[i] in column)) exit 2
+            next
+        }
+        {
+            rows += 1
+            for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
+            method = $(column["method"])
+            samplenum = $(column["samplenum"])
+            depth = $(column["depth"])
+            variable = $(column["variable"])
+            mean = $(column["mean"])
+            n_valid = $(column["n_valid"])
+            n_total = $(column["n_total"])
+            n_no_calls = $(column["n_no_calls"])
+
+            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
+            if (variable != "power" && variable != "FDP" && variable != "youden_index") exit 4
+            if (!is_number(mean) || !is_integer(n_valid) || !is_integer(n_total) ||
+                !is_integer(n_no_calls)) exit 5
+            if (n_valid != expected_replicates || n_total != expected_replicates ||
+                n_no_calls > n_total) exit 6
+            if ((variable == "power" || variable == "FDP") && (mean < 0 || mean > 1)) exit 7
+            if (variable == "youden_index" && (mean < -1 || mean > 1)) exit 8
+
+            key = method SUBSEP samplenum SUBSEP depth SUBSEP variable
+            if (seen[key]++) exit 9
+            group_key = method SUBSEP samplenum SUBSEP depth
+            if (group_key in group_no_calls && group_no_calls[group_key] != n_no_calls) exit 10
+            group_no_calls[group_key] = n_no_calls
+        }
+        END {
+            if (rows != expected_rows) exit 11
+        }
+    ' "$output_dir/synth_summary.csv" || fail "invalid synthetic metric summary"
 }
 
 verify_quasi_trace_keys() {
@@ -640,6 +844,7 @@ do
 done
 
 require_file "$output_dir/deseq_poorfits.RData"
+require_file "$output_dir/quasi_results.csv"
 
 # KI-027: with fewer than five permutations this is currently RData carrying a
 # .pdf extension. Keep the default smoke run fast without blessing that format.
@@ -649,7 +854,16 @@ else
     require_file "$output_dir/permute_violins.pdf"
 fi
 
-[[ ! -e "$output_dir/synth_plot.pdf" ]] || fail "disabled synthetic output was published"
+if [[ "$smoke_synth" == 1 ]]; then
+    require_pdf "$output_dir/synth_plot.pdf"
+    require_file "$output_dir/synth_results.csv"
+    require_file "$output_dir/synth_summary.csv"
+else
+    for disabled_synth_output in synth_plot.pdf synth_results.csv synth_summary.csv; do
+        [[ ! -e "$output_dir/$disabled_synth_output" ]] ||
+            fail "disabled synthetic output was published: $disabled_synth_output"
+    done
+fi
 [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
 require_file "$log_dir/trace.tsv"
 verify_filter_warning
@@ -659,7 +873,10 @@ verify_reference_direction
 verify_null_permutations
 verify_permutation_trace_keys
 verify_quasi_trace_keys
-verify_quasi_sample_sizes
+verify_quasi_metrics
+if [[ "$smoke_synth" == 1 ]]; then
+    verify_fullsynth_metrics
+fi
 
 # Materialize the valid plots before the temporary work tree and its published
 # symlinks are removed. This directory is ignored by Git and refreshed in place.
@@ -675,10 +892,18 @@ do
     cp -L "$output_dir/$smoke_pdf" "$plot_dir/$smoke_pdf"
 done
 
+if [[ "$smoke_synth" == 1 ]]; then
+    cp -L "$output_dir/synth_plot.pdf" "$plot_dir/synth_plot.pdf"
+else
+    rm -f "$plot_dir/synth_plot.pdf"
+fi
+
+cp -L "$output_dir/quasi_results.csv" "$plot_dir/quasi_results.csv"
+
 if [[ "$smoke_nperms" -ge 5 ]]; then
     cp -L "$output_dir/permute_violins.pdf" "$plot_dir/permute_violins.pdf"
 else
     rm -f "$plot_dir/permute_violins.pdf"
 fi
 
-printf 'Smoke-test plots retained at: %s\n' "$plot_dir"
+printf 'Smoke-test artifacts retained at: %s\n' "$plot_dir"

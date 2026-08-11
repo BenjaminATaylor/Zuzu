@@ -15,17 +15,9 @@ None currently.
 
 ## High
 
-### KI-008: Empty discovery or truth sets produce invalid metrics and summaries
-
-The quasi and synthetic analyzers calculate FDP as `1 - TP / calls`. When a method makes no calls, this becomes `0 / 0` and yields `NaN`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) then averages values without removing missing values, so one empty-call replicate can blank an entire summary cell.
-
-If the simulated truth set is empty, power also divides by zero and Youden's index has no positive truth class; if every gene is in the truth set, it has no negative truth class. This can occur with an invalid DEG proportion or if simulator filtering removes all simulated DE or background genes, and may produce invalid metrics or abort analysis.
-
-Impact: valid empty-set outcomes can corrupt summaries or fail tasks. Counts of TP, FP, TN, FN, tested genes, called genes, and truth genes should be retained; zero-call and zero-truth conventions should be defined explicitly.
-
 ### KI-010: Quasi results are censored when too few retained genes are available
 
-The quasi analyzers emit only `NA` metrics when the retained truth set contains ten or fewer genes.
+The quasi analyzers emit `NA` metrics with an `insufficient_truth` status when the retained truth set contains ten or fewer genes. KI-008 added the tested, truth, and background counts needed to identify these rows, but did not change the censoring rule.
 
 Impact: methods producing fewer high-confidence anchor calls, stringent cutoffs, and smaller sample sizes disappear from summaries rather than recording low or uncertain performance, creating method- and sample-size-dependent missingness.
 
@@ -113,15 +105,15 @@ Impact: rebuilding or rerunning later can change behaviour and numerical results
 
 ### KI-021: Current HEAD lacks a documented clean end-to-end run
 
-The current commit now has a successful cold smoke run covering the non-ML, non-synthetic workflow. The only full default-configuration run used `-resume`, predates the latest plotting/profile changes, and reused more cached tasks than it executed.
+The current implementation has successful cold smoke runs for the standard non-ML workflow and the opt-in non-ML full-synthetic path. The only run combining the default SVC and synthetic configuration used `-resume`, predates the latest plotting/profile changes, and reused more cached tasks than it executed.
 
-Impact: the SVC and full-synthetic branches have not yet been shown to complete together from a cold cache on the current commit.
+Impact: SVC and the complete default branch combination have not yet been shown to complete together from a cold cache on the current implementation.
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. It deliberately omits SVC and full-synthetic benchmarking, does not assert numerical scientific results, and is not run by a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting. The checks assert structural invariants and exact relationships among confusion counts and derived metrics, but they do not pin expected inferential results, exercise SVC, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
-Impact: major non-ML workflow breakage is now easier to detect, but regressions in omitted branches or scientific calculations can still go unnoticed.
+Impact: major non-ML workflow breakage and metric inconsistencies are easier to detect, but SVC regressions, dependency-driven numerical changes, and failures outside the covered invariants can still go unnoticed.
 
 ### KI-023: Run provenance is incomplete
 
@@ -232,6 +224,14 @@ The smoke fixture includes sentinel genes confirming that below-CPM and insuffic
 Resolved 2026-08-10. Every quasi and full-synthetic analyzer now calculates signed Youden's index directly from the binary truth and call vectors as sensitivity minus false-positive rate. Outputs use the `youden_index` field, and plots label the metric as Youden's index over its full -1 to 1 range. The pROC calculation and its automatic score-direction selection were removed, so an inverted result remains negative rather than being presented as successful discrimination.
 
 The metric is explicitly documented as a summary at the fixed DEG or feature-selection threshold. Zuzu no longer describes it as a threshold-independent ROC AUC or as a balance between power and false discovery proportion.
+
+### KI-008: Empty discovery or truth sets produced invalid metrics and summaries
+
+Resolved 2026-08-11. Whenever a quasi or full-synthetic analyzer evaluates metrics, it now derives power, FDP, and Youden's index from explicit true-positive, false-positive, true-negative, and false-negative counts over one fixed gene universe. Outputs also retain the tested, called, truth, and background sizes plus a metric status. `n_tested` denotes this full input universe, so genes with unavailable adjusted p-values after internal method filtering remain uncalled rather than leaving the denominator. Quasi rows censored under KI-010 retain the universe sizes and `insufficient_truth` status while their unavailable call and confusion counts remain `NA`. An evaluated method making no calls receives power 0, FDP 0 under the standard `FP / max(calls, 1)` convention, and Youden's index 0 when both truth classes exist.
+
+[`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now rejects empty generated matrices, duplicate identifiers, truth genes absent from the generated count matrix, and synthetic benchmarks lacking either a true or background class. The analyzers repeat the truth-universe checks defensively. SVC pare mode records unmodelled genes as uncalled so debugging does not change the benchmark denominator.
+
+[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show the valid denominator. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, status, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
 
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 

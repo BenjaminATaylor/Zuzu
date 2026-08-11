@@ -10,6 +10,7 @@ process QUASI_PLOTS{
 
   output:
   path "quasi_plot.pdf"
+  path "quasi_results.csv"
 
   script:
   """
@@ -20,18 +21,22 @@ process QUASI_PLOTS{
   read_quasis = function(dir, label){
     lapply(list.files(dir, full.names = TRUE), read.csv) %>%
       bind_rows() %>%
-      mutate_all(as.numeric) %>%
-      mutate(method = label) %>%
-      melt(
-        id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),
-        measure.vars = c("power", "FDP", "youden_index")
-      )
+      mutate(method = label)
   }
 
-  gg.quasi.input = rbind(
+  quasi.results = bind_rows(
     read_quasis("deseq",  "DESeq2"),
     read_quasis("edger",  "edgeR"),
     read_quasis("wilcox", "Wilcoxon")
+  ) %>%
+    arrange(method, replicate, totalnum, refnum, altnum)
+
+  write.csv(quasi.results, "quasi_results.csv", row.names = FALSE)
+
+  gg.quasi.input = melt(
+    quasi.results,
+    id.vars = c("method", "replicate", "refnum", "altnum", "totalnum"),
+    measure.vars = c("power", "FDP", "youden_index")
   ) %>%
     mutate(variable = fct_recode(variable,
                                  "Youden's index" = "youden_index")) %>%
