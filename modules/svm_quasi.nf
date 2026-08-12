@@ -14,11 +14,11 @@ process SVM_QUASI {
   library(tidyverse)
   library(e1071)
   library(pracma) # for movavg
-  library("pROC")
     
   # Read in raw data 
   data.y = read.csv(file = "$samplesheet")
   data.x = read.csv(file = "$quasiframe", row.names = 1, check.names = F)
+  allgenes = row.names(data.x)
   
   # Pare for testing
   data.x = head(data.x, 7000)
@@ -27,11 +27,28 @@ process SVM_QUASI {
   samplenum = $samplenum
   truedegs = get(load("$truedegs"))
 
+  if(anyDuplicated(allgenes)) stop("Quasi count matrix contains duplicate gene identifiers")
+  if(anyDuplicated(truedegs)) stop("Quasi truth set contains duplicate gene identifiers")
+  missing.truth = setdiff(truedegs, allgenes)
+  if(length(missing.truth) > 0){
+    stop(sprintf("Quasi truth set contains %d untested genes", length(missing.truth)))
+  }
+  n.tested = length(allgenes)
+  n.truth = length(truedegs)
+  n.background = n.tested - n.truth
+
+  true.positives = NA_integer_
+  false.positives = NA_integer_
+  true.negatives = NA_integer_
+  false.negatives = NA_integer_
+  n.called = NA_integer_
+  metric.status = "insufficient_truth"
+
   # Reencode the phenotype data
   data.y\$phenotype = as.numeric(as.factor(data.y\$phenotype))-1
 
-  # Generate output metrics only if there are at least 10 'true' DEGs, otherwise outputs NAs
-  if(length(truedegs)>=10){
+  # Generate output metrics only if there are more than 10 'true' DEGs, otherwise output NAs
+  if(length(truedegs)>10){
 
     #### Define SVM function
     svm.train = function(readcounts, traindata, referencelevel = 0, kerneltype = "linear", crossfold = 5){
@@ -152,26 +169,67 @@ process SVM_QUASI {
     minerrindex = which(errors == min(errors))
     dropgenes = iterations[1:(minerrindex*stepsize),]\$feature
 
-    # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
+    # Classify every gene in the fixed quasi-permutation universe. Genes omitted by
+    # the legacy pare step remain uncalled rather than leaving the denominator.
     quasidegs = row.names(data.x)[which((row.names(data.x) %in% dropgenes)==FALSE)]  
-    power = length(which(truedegs %in% quasidegs))/length(truedegs)
+    truth = allgenes %in% truedegs
+    called = allgenes %in% quasidegs
+    true.positives = sum(called & truth)
+    false.positives = sum(called & !truth)
+    true.negatives = sum(!called & !truth)
+    false.negatives = sum(!called & truth)
+    n.called = sum(called)
 
-    # 2. FDP: the proportion of all DEGs that are false positives
-    FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
+    # 1. Power: the proportion of retained anchor genes selected as features
+    power = true.positives / n.truth
 
-    # 3. ROC AUC
-    allgenes = row.names(data.x)
-    truelabels = as.numeric(allgenes %in% truedegs)
-    quasilabels = as.numeric(allgenes %in% quasidegs)
-    AUC = auc(truelabels, quasilabels)
-    # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-    normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+    # 2. FDP: the proportion of all selected features that fall outside the retained anchor set
+    # FDP is defined as zero if no features are selected
+    FDP = if(n.called == 0) 0 else false.positives / n.called
+
+    # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the selected-feature threshold
+    if(n.background == 0){
+      youden_index = NA_real_
+      metric.status = "youden_undefined_no_background"
+    } else {
+      youden_index = (true.positives / n.truth) -
+                     (false.positives / n.background)
+      metric.status = if(n.called == 0) "no_calls" else "ok"
+    }
 
     # Save outputs
-    outframe = data.frame(power = power, FDP = FDP, normAUC = normAUC, samplenum = samplenum)
+    outframe = data.frame(
+      power = power,
+      FDP = FDP,
+      youden_index = youden_index,
+      true_positives = true.positives,
+      false_positives = false.positives,
+      true_negatives = true.negatives,
+      false_negatives = false.negatives,
+      n_tested = n.tested,
+      n_called = n.called,
+      n_truth = n.truth,
+      n_background = n.background,
+      metric_status = metric.status,
+      samplenum = samplenum
+    )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
   } else {
-    outframe = data.frame(power = NA, FDP = NA, normAUC = NA, samplenum = samplenum)
+    outframe = data.frame(
+      power = NA_real_,
+      FDP = NA_real_,
+      youden_index = NA_real_,
+      true_positives = true.positives,
+      false_positives = false.positives,
+      true_negatives = true.negatives,
+      false_negatives = false.negatives,
+      n_tested = n.tested,
+      n_called = n.called,
+      n_truth = n.truth,
+      n_background = n.background,
+      metric_status = metric.status,
+      samplenum = samplenum
+    )
     write.csv(outframe, file="outframe.csv", row.names = FALSE)
   }
 

@@ -64,6 +64,7 @@ process DATA_PERMUTE{
     weights = exp(log.weights - max(log.weights))
     weights = weights / sum(weights)
     
+    # Draw one valid label assignment
     set.seed(as.integer(seed))
     selected.overlap = valid.overlaps[
       sample.int(length(valid.overlaps), 1L, prob = weights)
@@ -106,6 +107,7 @@ process DATA_PERMUTE{
     seed = $x
   )
 
+  # Apply the labels while preserving sample metadata and group sizes
   samplesheet.perm = samplesheet
   samplesheet.perm\$phenotype = permutation\$labels
   non.phenotype.columns = setdiff(colnames(samplesheet), "phenotype")
@@ -114,6 +116,7 @@ process DATA_PERMUTE{
   stopifnot(identical(table(samplesheet.perm\$phenotype),
                       table(as.character(samplesheet\$phenotype))))
 
+  # Record permutation diagnostics
   permutation.metadata = data.frame(
     replicate = as.integer($x),
     correlation = permutation\$correlation,

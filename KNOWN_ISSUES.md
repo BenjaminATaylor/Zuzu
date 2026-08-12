@@ -15,40 +15,6 @@ None currently.
 
 ## High
 
-### KI-006: The common gene filter is phenotype-aware and raw-depth-dependent
-
-[`CLEANINPUTS`](modules/cleaninputs.nf) retains a gene when the maximum of its two raw phenotype-group means exceeds five. This specific rule is contrast-dependent and ignores library size.
-
-Impact: sequencing-depth differences and chance group imbalances can affect which hypotheses enter testing. A label-blind CPM/prevalence rule, or a clearly documented purpose-built design-aware rule such as edgeR's `filterByExpr`, would provide a more defensible testing universe.
-
-### KI-007: Reported ROC AUC is calculated from binary DEG calls
-
-The quasi and full-synthetic analyzers pass binary selected/not-selected calls to the ROC calculation instead of a continuous statistic or score. With a binary predictor, the resulting AUC is equivalent to balanced accuracy at one threshold, potentially after pROC automatically reverses the score direction. `normAUC = 2 * AUC - 1` is the corresponding single-threshold Youden index rather than an area over a multi-threshold ROC curve.
-
-Affected modules include the `*_quasi.nf`, `*_fullsynth.nf`, and [`svc_fullsynth_postprocess.nf`](modules/svc_fullsynth_postprocess.nf) analyzers.
-
-Impact: `normAUC` is mislabelled and does not provide the claimed threshold-independent balance of power and false discovery.
-
-### KI-008: Empty discovery or truth sets produce invalid metrics and summaries
-
-The quasi and synthetic analyzers calculate FDP as `1 - TP / calls`. When a method makes no calls, this becomes `0 / 0` and yields `NaN`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) then averages values without removing missing values, so one empty-call replicate can blank an entire summary cell.
-
-If the simulated truth set is empty, power also divides by zero and ROC has only one response class. This can occur with an invalid zero DEG proportion or if simulator filtering removes all simulated DE genes, and may abort analysis rather than merely produce a missing summary.
-
-Impact: valid empty-set outcomes can corrupt summaries or fail tasks. Counts of TP, FP, TN, FN, tested genes, called genes, and truth genes should be retained; zero-call and zero-truth conventions should be defined explicitly.
-
-### KI-010: Quasi results are censored when too few retained genes are available
-
-The quasi analyzers emit only `NA` metrics when the retained truth set contains ten or fewer genes.
-
-Impact: methods producing fewer high-confidence anchor calls, stringent cutoffs, and smaller sample sizes disappear from summaries rather than recording low or uncertain performance, creating method- and sample-size-dependent missingness.
-
-### KI-011: Synthetic analysis ignores the alternative-group sample size
-
-[`DATA_FULLSYNTH`](modules/data_fullsynth.nf) accepts both `refnum` and `altnum`, but passes only `refnum` to compcodeR as `samples.per.cond`. Every synthetic dataset is therefore balanced even when the source groups and calculated breaks are unequal.
-
-Impact: synthetic benchmarks do not represent the requested unbalanced design and may contain a different total sample count from the source experiment.
-
 ### KI-012: SVC preprocessing leaks information across validation folds
 
 The SVC modules fit `StandardScaler` to the complete dataset before `RFECV` performs cross-validation.
@@ -69,7 +35,7 @@ Impact: selected genes are predictive features, not directly equivalent to FDR-c
 
 The quasi-permutation branch deliberately derives a separate set of high-confidence anchor genes with each method, retains half of those genes unchanged, and asks the same method to recover them after the remaining genes are permuted. This is a method-specific self-consistency analysis, not a benchmark against independent biological truth. Different methods are not expected to share an anchor set or quasi-permuted dataset, and their resulting values are not direct measures of comparative accuracy.
 
-The README now states this distinction, but process outputs and plots still label the quantities as `power`, `FDP`, and `normAUC`, use `trueDEGs` for method-selected anchors, and display methods side by side. The separate mathematical problem with `normAUC` is covered by KI-007.
+The README now states this distinction, but process outputs still use the fields `power`, `FDP`, and `youden_index`, plots still present Power, FDP, and Youden's index side by side across methods, and the workflow uses `trueDEGs` for method-selected anchors. KI-007 corrected the former ROC AUC terminology, but this presentation can still imply externally validated accuracy in the quasi branch.
 
 Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
 
@@ -127,15 +93,15 @@ Impact: rebuilding or rerunning later can change behaviour and numerical results
 
 ### KI-021: Current HEAD lacks a documented clean end-to-end run
 
-The current commit now has a successful cold smoke run covering the non-ML, non-synthetic workflow. The only full default-configuration run used `-resume`, predates the latest plotting/profile changes, and reused more cached tasks than it executed.
+The current implementation has successful cold smoke runs for the standard non-ML workflow and the opt-in non-ML full-synthetic path. The only run combining the default SVC and synthetic configuration used `-resume`, predates the latest plotting/profile changes, and reused more cached tasks than it executed.
 
-Impact: the SVC and full-synthetic branches have not yet been shown to complete together from a cold cache on the current commit.
+Impact: SVC and the complete default branch combination have not yet been shown to complete together from a cold cache on the current implementation.
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. It deliberately omits SVC and full-synthetic benchmarking, does not assert numerical scientific results, and is not run by a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting, including the preservation of exact unequal group sizes and sample-sheet/count-column alignment. The checks assert structural invariants and exact relationships among confusion counts and derived metrics, but they do not pin expected inferential results, exercise SVC, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
-Impact: major non-ML workflow breakage is now easier to detect, but regressions in omitted branches or scientific calculations can still go unnoticed.
+Impact: major non-ML workflow breakage and metric inconsistencies are easier to detect, but SVC regressions, dependency-driven numerical changes, and failures outside the covered invariants can still go unnoticed.
 
 ### KI-023: Run provenance is incomplete
 
@@ -235,9 +201,41 @@ Assignments are sampled directly and uniformly from the fixed-margin label vecto
 
 The smoke regression verifies that the forwarded count matrix is byte-identical to the cleaned input, group sizes and sample order are preserved, every label correlation satisfies the constraint, no replacement count matrix is created, and all non-ML methods consume each replicate exactly once.
 
+### KI-006: The common gene filter was phenotype-aware and raw-depth-dependent
+
+Resolved 2026-08-10. [`CLEANINPUTS`](modules/cleaninputs.nf) now calculates counts per million from each sample's rounded, unfiltered library total and retains genes with at least 1 CPM in at least as many samples as the smaller phenotype group. Group size determines the required prevalence, but group membership is not used in any gene's filtering decision. The retained count values are not transformed, and the same filtered matrix is shared by QC and every baseline, null-permutation, and quasi-permutation method. If more than half of the input genes are removed, the process reports the counts and percentage in a visible warning while continuing with the retained genes. The full-synthetic branch remains separate under KI-016.
+
+The smoke fixture includes sentinel genes confirming that below-CPM and insufficiently prevalent genes are removed, sufficiently prevalent genes are retained, expression confined to one complete phenotype group is not discarded, retained counts remain unchanged, and a greater-than-50% removal warning reaches the console. A separate fixed-margin relabelling check confirmed that phenotype assignments do not alter the retained gene set.
+
+### KI-007: ROC AUC was calculated from binary DEG calls
+
+Resolved 2026-08-10. Every quasi and full-synthetic analyzer now calculates signed Youden's index directly from the binary truth and call vectors as sensitivity minus false-positive rate. Outputs use the `youden_index` field, and plots label the metric as Youden's index over its full -1 to 1 range. The pROC calculation and its automatic score-direction selection were removed, so an inverted result remains negative rather than being presented as successful discrimination.
+
+The metric is explicitly documented as a summary at the fixed DEG or feature-selection threshold. Zuzu no longer describes it as a threshold-independent ROC AUC or as a balance between power and false discovery proportion.
+
+### KI-008: Empty discovery or truth sets produced invalid metrics and summaries
+
+Resolved 2026-08-11. Whenever a quasi or full-synthetic analyzer evaluates metrics, it now derives power, FDP, and Youden's index from explicit true-positive, false-positive, true-negative, and false-negative counts over one fixed gene universe. Outputs also retain the tested, called, truth, and background sizes plus a metric status. `n_tested` denotes this full input universe, so genes with unavailable adjusted p-values after internal method filtering remain uncalled rather than leaving the denominator. KI-010 subsequently removed the quasi branch's temporary ten-anchor censoring, so active quasi rows now retain complete call and confusion counts even when few or no anchors are available. A method making no calls receives FDP 0 under the standard `FP / max(calls, 1)` convention; power and Youden's index are also zero when both truth classes exist, but remain undefined when their required classes are absent.
+
+[`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now rejects empty generated matrices, duplicate identifiers, truth genes absent from the generated count matrix, and synthetic benchmarks lacking either a true or background class. The analyzers repeat the truth-universe checks defensively. SVC pare mode records unmodelled genes as uncalled so debugging does not change the benchmark denominator.
+
+[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show the valid denominator. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, zero- and low-anchor statuses, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
+
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 
 Resolved 2026-08-10 alongside KI-005. The raw 20--80% agreement rule and its 100-attempt retry loop were replaced by exact enumeration of the correlations attainable at the observed binary group sizes. The process draws directly from all valid fixed-margin assignments, so heavily unbalanced designs no longer fail merely because their unavoidable raw agreement is high.
+
+### KI-010: Quasi results were censored when too few retained genes were available
+
+Resolved 2026-08-11. The active DESeq2, edgeR, and Wilcoxon quasi analyzers now run for every retained-anchor count. Rows with one to ten anchors retain their complete confusion counts and calculated metrics with a `low_anchor_count` status when background genes remain, rather than disappearing behind an arbitrary cutoff. When no anchors are retained, the analyzers still report calls, confusion counts, and FDP under a `no_anchors` status; power and Youden's index remain `NA` because there is no positive class. If no background genes remain, Youden's index is `NA` under `youden_undefined_no_background` regardless of anchor count.
+
+[`QUASI_PLOTS`](modules/quasi_plots.nf) distinguishes adequate, low, and empty anchor sets by point shape and states why power and Youden's index are absent for empty sets. The smoke validator enforces the count identities, formulas, bounds, and status precedence for zero-, low-, and adequate-anchor rows, rejects defined recovery metrics without anchors, and guards the active analyzers against reintroducing the old gate.
+
+### KI-011: Synthetic analysis ignored the alternative-group sample size
+
+Resolved 2026-08-11. [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now asks compcodeR to generate both conditions at the larger requested group size, then uses the replicate seed to select the exact requested number of reference and alternative samples. It verifies both group counts and sample-sheet/count-column alignment before emitting the dataset. The analyzers retain and validate `refnum`, `altnum`, and `totalnum`, while [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) groups results and labels sample sizes using both group counts.
+
+The opt-in synthetic smoke validator checks every generated sample-sheet/count-matrix pair directly. It requires the exact 11+9, 20+16, and 30+24 fixture designs at every depth and replicate, unique sample identifiers, aligned count headers, the expected task and pair frequencies, and consistent sample-size fields in the per-replicate and summary tables. The cold non-ML synthetic smoke run passed.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

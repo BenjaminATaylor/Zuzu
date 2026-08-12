@@ -32,6 +32,7 @@ process QUALITYCONTROL {
   stopifnot(nlevels(samplesheet\$phenotype) == 2L,
             identical(levels(samplesheet\$phenotype)[1], reflevel))
 
+  # Variance-stabilise counts for sample-level plots
   vst.counts = countsframe.clean %>% as.matrix() %>% varianceStabilizingTransformation()
 
   ## Heatmap of sample distances
@@ -89,6 +90,7 @@ process QUALITYCONTROL {
           labs(x = "Sample", y = "Counts") +
           theme_bw() +
           theme(axis.text.x = element_text(angle=90)))
+  # Combine and save the QC plots
   ggout = ggarrange(as.ggplot(heatmap), gg.pca, gg.cooks, gg.counts)
   ggsave(ggout, 
          filename = "QC_plots.pdf",

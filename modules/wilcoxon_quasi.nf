@@ -18,7 +18,6 @@ process WILCOXON_QUASI {
     #!/usr/bin/env Rscript
     library("tidyverse", quietly = TRUE)
     library("edgeR", quietly = TRUE)
-    library("pROC", quietly = TRUE)
 
     DEBUG=FALSE
 
@@ -30,6 +29,7 @@ process WILCOXON_QUASI {
     alt.num = as.integer($altnum)
     reflevel = "$params.reflevel"
 
+    # Validate sample sizes and count-matrix alignment
     observed.refnum = sum(samplesheet\$phenotype == reflevel)
     observed.altnum = sum(samplesheet\$phenotype != reflevel)
     stopifnot(observed.refnum == ref.num)
@@ -38,54 +38,90 @@ process WILCOXON_QUASI {
     stopifnot(ncol(quasi.frame) == ref.num + alt.num)
     stopifnot(identical(colnames(quasi.frame), samplesheet\$sample))
 
-    # Generate output metrics only if there are at least 10 'true' DEGs, otherwise outputs NAs
-    if(length(truedegs)>10){
+    # Validate the anchors against the fixed quasi-permutation gene universe
+    allgenes = row.names(quasi.frame)
+    if(anyDuplicated(allgenes)) stop("Quasi count matrix contains duplicate gene identifiers")
+    if(anyDuplicated(truedegs)) stop("Quasi truth set contains duplicate gene identifiers")
+    missing.truth = setdiff(truedegs, allgenes)
+    if(length(missing.truth) > 0){
+      stop(sprintf("Quasi truth set contains %d untested genes", length(missing.truth)))
+    }
+    n.tested = length(allgenes)
+    n.truth = length(truedegs)
+    n.background = n.tested - n.truth
 
-        #Wilcox analysis using quasi-permuted data
-        countsframe.dge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)
-        countsframe.dge = calcNormFactors(countsframe.dge,method="TMM")
-        countsframe.dge = cpm(countsframe.dge) %>% as.data.frame()
-        allgenes = row.names(countsframe.dge)
+    # Run Wilcoxon using the quasi-permuted data
+    countsframe.dge = DGEList(counts=quasi.frame,group=samplesheet\$phenotype)
+    countsframe.dge = calcNormFactors(countsframe.dge,method="TMM")
+    countsframe.dge = cpm(countsframe.dge) %>% as.data.frame()
+    stopifnot(identical(row.names(countsframe.dge), allgenes))
 
-        # Split data into ref and alt counts
-        refcounts = select(countsframe.dge, subset(samplesheet, phenotype == reflevel)\$sample)
-        altcounts = select(countsframe.dge, subset(samplesheet, phenotype != reflevel)\$sample)
-        # Run wilcox tests on each gene
-        gene.wilcox = function(x){
-            this.wilcox = wilcox.test(as.numeric(refcounts[x,]), as.numeric(altcounts[x,]))
-            return(this.wilcox\$p.value)
-        }
-        wilcox.p = sapply(allgenes, gene.wilcox)
-        # Adjust to FDR
-        wilcox.out.quasi = p.adjust(wilcox.p,method = "BH") %>% 
-            `names<-`(allgenes) %>% 
-            data.frame() %>%
-            `colnames<-`("padj")
+    # Split data into ref and alt counts
+    refcounts = select(countsframe.dge, subset(samplesheet, phenotype == reflevel)\$sample)
+    altcounts = select(countsframe.dge, subset(samplesheet, phenotype != reflevel)\$sample)
+    # Run Wilcoxon tests on each gene
+    gene.wilcox = function(x){
+        this.wilcox = wilcox.test(as.numeric(refcounts[x,]), as.numeric(altcounts[x,]))
+        return(this.wilcox\$p.value)
+    }
+    wilcox.p = sapply(allgenes, gene.wilcox)
+    # Adjust to FDR
+    wilcox.out.quasi = p.adjust(wilcox.p,method = "BH") %>%
+        `names<-`(allgenes) %>%
+        data.frame() %>%
+        `colnames<-`("padj")
 
-        # 1. Power: the proportion of treu DEGs identified as DEGs in this comparison
-        quasidegs = row.names(subset(wilcox.out.quasi,padj<0.05))
-        power = length(which(truedegs %in% quasidegs))/length(truedegs)
+    # Classify every gene in the fixed quasi-permutation universe
+    quasidegs = row.names(subset(wilcox.out.quasi,padj<0.05))
+    truth = allgenes %in% truedegs
+    called = allgenes %in% quasidegs
+    true.positives = sum(called & truth)
+    false.positives = sum(called & !truth)
+    true.negatives = sum(!called & !truth)
+    false.negatives = sum(!called & truth)
+    n.called = sum(called)
 
-        # 2. FDP: the proportion of all DEGs that are false positives
-        FDP = 1-(length(which(quasidegs %in% truedegs))/length(quasidegs))
+    # 1. Power: the proportion of retained anchor genes identified as DEGs in this comparison
+    # Power is undefined if no anchors were retained
+    power = if(n.truth == 0) NA_real_ else true.positives / n.truth
 
-        # 3. ROC AUC
-        allgenes = row.names(quasi.frame)
-        truelabels = as.numeric(allgenes %in% truedegs)
-        quasilabels = as.numeric(allgenes %in% quasidegs)
-        AUC = auc(truelabels, quasilabels)
-        # Remember that 0.5 = a truly random ROC, so for best effect we do (0.5-AUC)*2
-        normAUC = (AUC-0.5)*2 # Greater deviation from 0 = better discrimination
+    # 2. FDP: the proportion of all identified DEGs that fall outside the retained anchor set
+    # FDP is defined as zero if no DEGs are identified
+    FDP = if(n.called == 0) 0 else false.positives / n.called
 
+    # 3. Youden's index: the anchor-recovery rate minus the background-call rate at the DEG threshold
+    # Youden's index requires both anchor and background genes
+    youden_index = if(n.truth == 0 || n.background == 0){
+        NA_real_
     } else {
-        power = NA
-        FDP = NA
-        normAUC = NA
+        (true.positives / n.truth) - (false.positives / n.background)
+    }
+
+    # Record the primary condition affecting metric interpretation
+    metric.status = if(n.truth == 0){
+        "no_anchors"
+    } else if(n.background == 0){
+        "youden_undefined_no_background"
+    } else if(n.truth <= 10){
+        "low_anchor_count"
+    } else if(n.called == 0){
+        "no_calls"
+    } else {
+        "ok"
     }
 
     outframe = data.frame(power = power,
                           FDP = FDP,
-                          normAUC = normAUC,
+                          youden_index = youden_index,
+                          true_positives = true.positives,
+                          false_positives = false.positives,
+                          true_negatives = true.negatives,
+                          false_negatives = false.negatives,
+                          n_tested = n.tested,
+                          n_called = n.called,
+                          n_truth = n.truth,
+                          n_background = n.background,
+                          metric_status = metric.status,
                           replicate = replicate.id,
                           refnum = ref.num,
                           altnum = alt.num,
