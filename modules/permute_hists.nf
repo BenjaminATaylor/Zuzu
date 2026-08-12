@@ -30,10 +30,10 @@ process PERMUTE_HISTS{
     }) %>% list_cbind() %>% rowSums(na.rm = TRUE)
   }
 
-  read_permdegs_py = function(dir){
+  read_permfeatures_py = function(dir){
     lapply(list.files(dir, full.names = TRUE), function(x){
       res <- read.csv(x, row.names = 1)
-      data.frame(result = (res\$DEGstatus == 1), row.names = row.names(res))
+      data.frame(result = (res\$selected_feature == 1), row.names = row.names(res))
     }) %>% list_cbind() %>% rowSums(na.rm = TRUE)
   }
 
@@ -42,12 +42,12 @@ process PERMUTE_HISTS{
   wilcox.permdegs = read_permdegs_r("wilcox")
 
   if("$params.mlstep" == "true"){
-    SVC.permdegs = read_permdegs_py("svc")
+    SVC.permfeatures = read_permfeatures_py("svc")
     permhist.in = cbind(deseq.permdegs,
                         edger.permdegs,
                         wilcox.permdegs,
-                        SVC.permdegs) %>%
-      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon", "SVC")) %>%
+                        SVC.permfeatures) %>%
+      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon", "SVC-RFECV candidates")) %>%
       melt()
   } else {
     permhist.in = cbind(deseq.permdegs,
@@ -68,7 +68,7 @@ process PERMUTE_HISTS{
   gg.permhist = ggplot(permhist.in, aes(x = value)) +
     geom_histogram(color = "black", fill = "white", bins = 100) +
     scale_x_continuous(limits = c(-1, (nperms + 1)), breaks = cutbreaks) +
-    labs(x = "Number of permutations in which gene was\nincorrectly identified as a DEG",
+    labs(x = "Number of permutations in which each gene was selected",
          y = "Number of genes") +
     theme_bw() +
     facet_grid(~Var2) +

@@ -33,7 +33,7 @@ process PERMUTE_PLOTS{
   deseq.perms = sapply(deseq.inlist, function(x) get(load(x))) %>% unname()
   # Collated input
   deseq.permute.input = data.frame( method = "DESeq2", 
-                                  nDEGs = deseq.ndegs, 
+                                  nSelected = deseq.ndegs,
                                   permutes = deseq.perms
                                   )
 
@@ -47,7 +47,7 @@ process PERMUTE_PLOTS{
   edger.perms = sapply(edger.inlist, function(x) get(load(x))) %>% unname()
   # Collated input
   edger.permute.input =  data.frame(method = "edgeR", 
-                                    nDEGs = edger.ndegs, 
+                                    nSelected = edger.ndegs,
                                     permutes = edger.perms)
 
   ## wilcoxon inputs
@@ -60,22 +60,22 @@ process PERMUTE_PLOTS{
   wilcox.perms = sapply(wilcox.inlist, function(x) get(load(x))) %>% unname()
   # Collated input
   wilcox.permute.input =  data.frame(method = "wilcox", 
-                                    nDEGs = wilcox.ndegs, 
+                                    nSelected = wilcox.ndegs,
                                     permutes = wilcox.perms)
   
   # Only include ML outputs if specified by user
   if("$params.mlstep" == "true"){
     ## SVC inputs
-    # DEGs from full model
+    # Candidate features from the full model
     SVC.table = read.csv("$SVC_table", row.names = 1)
-    SVC.ndegs = nrow(subset(SVC.table, DEGstatus==1))
+    SVC.nfeatures = nrow(subset(SVC.table, selected_feature == 1))
     # Permutations
     SVC.inlist = str_remove_all("$SVC_perms","[\\\\[\\\\] ]") %>% 
       strsplit(split = ",") %>% unlist()
     SVC.perms = sapply(SVC.inlist, function(x) as.integer(read.delim(x, header = FALSE))) %>% unname()
     # Collated input
-    SVC.permute.input =  data.frame(method = "SVC", 
-                                    nDEGs = SVC.ndegs, 
+    SVC.permute.input =  data.frame(method = "SVC-RFECV candidates",
+                                    nSelected = SVC.nfeatures,
                                     permutes = SVC.perms)
 
     # Combined inputs for plotting
@@ -93,9 +93,9 @@ process PERMUTE_PLOTS{
 
   print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
           geom_point(size = 3, alpha = 0.7) +
-          geom_point(aes(x = method, y = nDEGs), 
+          geom_point(aes(x = method, y = nSelected),
                     size =4 , color = "black", fill = "red", shape = 23) +
-          labs(x = "Method", y = "Number of DEGs") +
+          labs(x = "Method", y = "Number of selected genes") +
           theme_bw()
   )
 

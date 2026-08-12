@@ -7,7 +7,7 @@ Zuzu is an in-development research pipeline. Active issues below apply to the cu
 - **Medium:** limits validity, reproducibility, portability, or output quality under a narrower set of conditions.
 - **Low:** incomplete functionality, misleading presentation, or development/documentation debt.
 
-Until the critical and high-severity issues are resolved, benchmark results should be treated as exploratory.
+Benchmark results should still be treated as exploratory; the remaining limitations below define where stronger claims are not yet supported.
 
 ## Critical
 
@@ -15,19 +15,7 @@ None currently.
 
 ## High
 
-### KI-012: SVC preprocessing leaks information across validation folds
-
-The SVC modules fit `StandardScaler` to the complete dataset before `RFECV` performs cross-validation.
-
-Affected modules: [`svc_basic.nf`](modules/svc_basic.nf), [`svc_permute.nf`](modules/svc_permute.nf), and [`svc_fullsynth.nf`](modules/svc_fullsynth.nf).
-
-Impact: validation folds influence their own preprocessing, which can produce optimistic feature-selection scores. Scaling and classification should be composed in a scikit-learn `Pipeline` fitted independently within each fold.
-
-### KI-013: SVC-selected features are interpreted more strongly than the method supports
-
-SVC/RFECV identifies a subset that optimizes cross-validated classification accuracy. It does not identify a statistical inflection point, prove that removed genes contribute only to overfitting, produce differential-expression p-values, or control false discovery rate. RFECV also always selects at least one feature.
-
-Impact: selected genes are predictive features, not directly equivalent to FDR-controlled DESeq2, edgeR, or Wilcoxon DEGs. Comparisons and labels that treat them as the same quantity are misleading.
+None currently.
 
 ## Medium
 
@@ -38,6 +26,12 @@ The quasi-permutation branch deliberately derives a separate set of high-confide
 The README now states this distinction, but process outputs still use the fields `power`, `FDP`, and `youden_index`, plots still present Power, FDP, and Youden's index side by side across methods, and the workflow uses `trueDEGs` for method-selected anchors. KI-007 corrected the former ROC AUC terminology, but this presentation can still imply externally validated accuracy in the quasi branch.
 
 Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
+
+### KI-013: SVC has no no-signal gate or gene-wise error control
+
+Stage 1 now labels the output as SVC-RFECV candidate features, keeps it distinct from conventional DEG calls, and describes the selected count as the smallest cross-validated maximum rather than an inflection point. However, RFECV still retains at least one feature, its internal maximum is not independent predictive performance, and it produces neither gene-wise p-values nor false-discovery-rate control.
+
+Impact: Stage 1 can report an exploratory predictive candidate set, but it cannot determine that phenotype signal exists or promote that set to a supported signature. The separately specified Stage 2 no-signal gate is still required before that stronger interpretation.
 
 ### KI-014: Only simple unpaired two-group designs are supported
 
@@ -78,30 +72,24 @@ Only `samplesheet`, `countsframe`, and `reflevel` receive explicit presence chec
 - `outdir`
 - `truecutoff`, including `0 < truecutoff < 1`
 - `synthdeg_pct` when `synthstep` is enabled, including a valid proportion range
-- `stepsize` when SVC is enabled
-- `njobs`, which is set only by the `local` and `cluster` profiles
 - `nperms`, including a positive-integer check
 - Boolean types for `mlstep`, `synthstep`, and `pareml`; arbitrary nonempty strings can be truthy in workflow conditionals while comparing unequal to `"true"` inside generated scripts
 
-Impact: invalid values can produce malformed scripts, unexpected task counts or seeds, inconsistent branch behaviour, misleading benchmarks, or late task failures. The default ML configuration can generate invalid Python for `n_jobs` when no profile supplies `njobs`.
+The Stage 1 SVC parameters now have shared defaults and validate `C`, class weighting, scoring, fold count, seed, RFE step, and job count before fitting, but this does not validate the remaining workflow-wide parameters above.
+
+Impact: invalid values can produce malformed scripts, unexpected task counts or seeds, inconsistent branch behaviour, misleading benchmarks, or late task failures.
 
 ### KI-020: Runtime dependencies are not reproducibly pinned
 
-The workflow uses the mutable container tag `benjaminataylor/zuzu:latest`. Nextflow is not version-constrained, Python packages have no pinned versions, apt-installed R packages have no fixed versions, and source-installed R packages can resolve newer releases during image builds.
+The workflow uses the mutable container tag `benjaminataylor/zuzu:latest`. Nextflow is not version-constrained, Python packages have no pinned versions, apt-installed R packages have no fixed versions, and source-installed R packages can resolve newer releases during image builds. SVC prediction bundles record their dependency versions, but their Python pickle format is environment-coupled: a bundle can fail to load under incompatible NumPy or scikit-learn versions and should therefore be used with matching compatible versions.
 
-Impact: rebuilding or rerunning later can change behaviour and numerical results without a source-code change.
-
-### KI-021: Current HEAD lacks a documented clean end-to-end run
-
-The current implementation has successful cold smoke runs for the standard non-ML workflow and the opt-in non-ML full-synthetic path. The only run combining the default SVC and synthetic configuration used `-resume`, predates the latest plotting/profile changes, and reused more cached tasks than it executed.
-
-Impact: SVC and the complete default branch combination have not yet been shown to complete together from a cold cache on the current implementation.
+Impact: rebuilding or rerunning later can change behaviour and numerical results without a source-code change, and saved SVC models are not guaranteed to load in a different software environment.
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting, including the preservation of exact unequal group sizes and sample-sheet/count-column alignment. The checks assert structural invariants and exact relationships among confusion counts and derived metrics, but they do not pin expected inferential results, exercise SVC, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including their estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results, automate the combined SVC-plus-synthetic run, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
-Impact: major non-ML workflow breakage and metric inconsistencies are easier to detect, but SVC regressions, dependency-driven numerical changes, and failures outside the covered invariants can still go unnoticed.
+Impact: major workflow breakage and metric inconsistencies are easier to detect, but dependency-driven numerical changes, full-synthetic SVC regressions, and failures outside the covered invariants can still go unnoticed.
 
 ### KI-023: Run provenance is incomplete
 
@@ -109,9 +97,9 @@ The workflow does not enable a standard trace, report, timeline, or manifest tha
 
 Impact: runs are difficult to audit or reproduce after the work directory and console history are gone.
 
-### KI-024: Basic result tables are not published
+### KI-024: Conventional basic result tables are not published
 
-Baseline DESeq2, edgeR, Wilcoxon, and SVC tables are consumed internally but have no `publishDir` or top-level workflow output. They remain only in Nextflow's work cache even though the README presents baseline DEG calling as a standalone use case.
+Baseline DESeq2, edgeR, and Wilcoxon tables are consumed internally but have no `publishDir` or top-level workflow output. They remain only in Nextflow's work cache even though the README presents baseline DEG calling as a standalone use case. Stage 1 now publishes the SVC candidate table and its supporting artifacts under `outdir/svctables`.
 
 Impact: primary inferential outputs are not durable user-facing deliverables.
 
@@ -144,12 +132,6 @@ Impact: executors that materialize inputs may reject the missing source, and any
 The `cluster` profile changes SVC parallelism and memory only. It does not select an executor, queue, or scheduler.
 
 Impact: the profile still runs locally unless an external site configuration supplies the missing cluster settings.
-
-### KI-030: SVC feature-selection plots use the wrong x-axis values
-
-The SVC modules label the x-axis as the number of selected features but plot `1..n_scores`. When `RFECV.step` is greater than one, these are evaluation indices rather than the actual feature counts.
-
-Impact: the plotted curve cannot be read as feature count versus validation accuracy and may misstate the location of the selected optimum.
 
 ## Low
 
@@ -236,6 +218,26 @@ Resolved 2026-08-11. The active DESeq2, edgeR, and Wilcoxon quasi analyzers now 
 Resolved 2026-08-11. [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now asks compcodeR to generate both conditions at the larger requested group size, then uses the replicate seed to select the exact requested number of reference and alternative samples. It verifies both group counts and sample-sheet/count-column alignment before emitting the dataset. The analyzers retain and validate `refnum`, `altnum`, and `totalnum`, while [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) groups results and labels sample sizes using both group counts.
 
 The opt-in synthetic smoke validator checks every generated sample-sheet/count-matrix pair directly. It requires the exact 11+9, 20+16, and 30+24 fixture designs at every depth and replicate, unique sample identifiers, aligned count headers, the expected task and pair frequencies, and consistent sample-size fields in the per-replicate and summary tables. The cold non-ML synthetic smoke run passed.
+
+### KI-012: SVC preprocessing leaked information across validation folds
+
+Resolved 2026-08-11. The three active SVC modules now call one shared implementation that applies `log2(CPM + 1)` and passes unscaled expression into `RFECV`. Its estimator is a scikit-learn `Pipeline` containing `StandardScaler` followed by a linear SVC, so every feature-elimination fit learns scaling from its own training fold. Ordinary and constrained-permutation fits use the pre-filter library sizes already calculated by `CLEANINPUTS`; full-synthetic fits use all genes in the unchanged emitted synthetic count matrix.
+
+The procedure explicitly maps the requested reference to class 0, uses balanced class weights and balanced accuracy, and records shuffled seeded stratified folds. It rejects a phenotype group smaller than the requested fold count rather than silently constructing an unsupported split. Its fixed defaults are exposed as validated parameters and retained in metadata rather than treated as immutable constants.
+
+Every run now publishes a complete candidate-feature table, fold assignments, curve data, plot, metadata, selected count, and a model bundle containing the fitted scaler-plus-SVC and the gene universe needed to reproduce raw-count normalization. The opt-in SVC smoke passed under the pipeline container and verified both imbalance directions, the small-class failure, and raw-count prediction from the persisted bundle.
+
+### KI-021: Current HEAD lacked a documented clean end-to-end run
+
+Resolved 2026-08-11. A cold Stage 1 run completed the baseline, constrained-permutation, quasi-permutation, and existing full-synthetic branches with `mlstep=true`, `synthstep=true`, `pareml=true`, and one replicate. It executed one baseline SVC fit, one constrained-permutation fit, all nine SVC full-synthetic fits, and all nine SVC postprocessors without cache reuse. The combined synthetic table contained nine rows for each of DESeq2, edgeR, Wilcoxon, and `SVC-RFECV candidates` over the unchanged 11+9, 20+16, and 30+24 by three-depth grid.
+
+This establishes mechanical completion of the current pared workflow, not benchmark-scale runtime, numerical reproducibility across dependency versions, or scientific validation of SVC as a DEG procedure.
+
+### KI-030: SVC feature-selection plots used the wrong x-axis values
+
+Resolved 2026-08-11. SVC curve tables and plots now use the actual feature counts evaluated by RFECV. The implementation reads scikit-learn's `n_features` result when available and reconstructs the same ascending count sequence for older releases, then verifies that it aligns with the score vector. For example, 100 genes at a step of 50 are plotted at 1, 50, and 100 rather than at evaluation indices 1, 2, and 3.
+
+The selected point is marked explicitly and verified to be the smallest evaluated feature set at the maximum mean fold score. Every fold score and its mean and standard deviation are retained alongside the plot. The implementation passed direct checks under scikit-learn 1.4 and the pipeline image's scikit-learn 1.8.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

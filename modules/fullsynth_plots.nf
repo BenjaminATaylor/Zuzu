@@ -68,7 +68,7 @@ process FULLSYNTH_PLOTS {
     wilcox.synth.input = read_fullsynths("wilcox", "Wilcoxon")
 
     if("$params.mlstep" == "true"){
-        svc.synth.input = read_fullsynths("svc", "SVC")
+        svc.synth.input = read_fullsynths("svc", "SVC-RFECV candidates")
         fullsynth.results = bind_rows(deseq.synth.input,
                                       edger.synth.input,
                                       wilcox.synth.input,

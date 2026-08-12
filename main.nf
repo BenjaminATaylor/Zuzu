@@ -83,23 +83,30 @@ workflow {
 
   //Initial data QC and cleanup
   CLEANINPUTS(ch_samplesheet, ch_countsframe, ch_reflevel)
-  QUALITYCONTROL(CLEANINPUTS.out)
+  // Reuse the SVC normalization sidecars for baseline and permuted fits
+  svc_library_sizes = CLEANINPUTS.out.svc_library_sizes
+  svc_library_genes = CLEANINPUTS.out.svc_library_genes
+  QUALITYCONTROL(CLEANINPUTS.out.cleaned)
   CREATE_BREAKS(ch_samplesheet)
   // Emit each generated reference/alternative subsample pair
   breaks = CREATE_BREAKS.out.splitCsv(header: false)
 
 
   //Basic analysis for each method
-  DESEQ_BASIC(CLEANINPUTS.out)
-  EDGER_BASIC(CLEANINPUTS.out)
-  WILCOXON_BASIC(CLEANINPUTS.out)
+  DESEQ_BASIC(CLEANINPUTS.out.cleaned)
+  EDGER_BASIC(CLEANINPUTS.out.cleaned)
+  WILCOXON_BASIC(CLEANINPUTS.out.cleaned)
   if (params.mlstep) {
-    SVC_BASIC(CLEANINPUTS.out)
+    SVC_BASIC(
+      CLEANINPUTS.out.cleaned,
+      svc_library_sizes,
+      svc_library_genes,
+    )
   }
 
   ////Permutation analysis with no true signal
   perms = channel.from(1..params.nperms)
-  DATA_PERMUTE(CLEANINPUTS.out, perms)
+  DATA_PERMUTE(CLEANINPUTS.out.cleaned, perms)
   // For DESeq
   DESEQ_PERMUTE(DATA_PERMUTE.out.frames)
   // For edgeR
@@ -108,7 +115,11 @@ workflow {
   WILCOXON_PERMUTE(DATA_PERMUTE.out.frames)
   if (params.mlstep) {
     // For SVC
-    SVC_PERMUTE(DATA_PERMUTE.out.frames)
+    SVC_PERMUTE(
+      DATA_PERMUTE.out.frames,
+      svc_library_sizes,
+      svc_library_genes,
+    )
   }
   // Combine outputs and plot
   PERMUTE_PLOTS(
@@ -119,7 +130,7 @@ workflow {
     WILCOXON_BASIC.out,
     WILCOXON_PERMUTE.out.nDEGs.collect(),
     params.mlstep ? SVC_BASIC.out.table : dummypath,
-    params.mlstep ? SVC_PERMUTE.out.nDEGs.collect() : dummypath,
+    params.mlstep ? SVC_PERMUTE.out.nFeatures.collect() : dummypath,
   )
   // Compare baseline DEG calls across methods
   INTER_OBSERVER_BASIC(
@@ -142,11 +153,11 @@ workflow {
 
 
   // Quasi-permutation analysis with partial true signal retained
-  DESEQ_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+  DESEQ_DATA_QUASI(CLEANINPUTS.out.cleaned, perms.combine(breaks))
   DESEQ_QUASI(DESEQ_DATA_QUASI.out)
-  EDGER_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+  EDGER_DATA_QUASI(CLEANINPUTS.out.cleaned, perms.combine(breaks))
   EDGER_QUASI(EDGER_DATA_QUASI.out)
-  WILCOXON_DATA_QUASI(CLEANINPUTS.out, perms.combine(breaks))
+  WILCOXON_DATA_QUASI(CLEANINPUTS.out.cleaned, perms.combine(breaks))
   WILCOXON_QUASI(WILCOXON_DATA_QUASI.out)
   if (params.mlstep) {
   }
@@ -168,7 +179,7 @@ workflow {
     WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
     if (params.mlstep) {
       SVC_FULLSYNTH(DATA_FULLSYNTH.out)
-      SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out)
+      SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out.result)
     }
 
     FULLSYNTH_PLOTS(

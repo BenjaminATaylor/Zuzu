@@ -51,7 +51,7 @@ process INTER_OBSERVER_BASIC{
     wilcox.table = read.csv("$wilcox_table", row.names = 1)
     getdegs = function(df, ml=FALSE){ 
     if(ml){
-            return(row.names(subset(df, DEGstatus==1))) 
+            return(row.names(subset(df, selected_feature == 1)))
         } else { 
             return(row.names(subset(df, padj<0.05))) 
         } 
@@ -63,7 +63,7 @@ process INTER_OBSERVER_BASIC{
     # TODO: Fix this to work for ML outputs also
     if("false" == "true"){
         svc.table = read.csv("$SVC_table", row.names = 1)
-        degs.svc = getdegs("svc_table.csv", ml=TRUE)
+        degs.svc = getdegs(svc.table, ml=TRUE)
     }
 
     # Combine adjusted p-values across the shared gene order

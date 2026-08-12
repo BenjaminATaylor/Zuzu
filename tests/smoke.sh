@@ -9,6 +9,7 @@ source_counts="$repo_dir/input/synthtest/synthcounts.csv"
 plot_dir="$script_dir/.smoke-plots"
 smoke_nperms="${SMOKE_NPERMS:-1}"
 smoke_synth="${SMOKE_SYNTH:-0}"
+smoke_svc="${SMOKE_SVC:-0}"
 smoke_max_permute_correlation="0.6"
 
 fail() {
@@ -22,6 +23,10 @@ fail() {
 [[ -f "$source_counts" ]] || fail "fixture count matrix is missing"
 [[ "$smoke_nperms" =~ ^[1-9][0-9]*$ ]] || fail "SMOKE_NPERMS must be a positive integer"
 [[ "$smoke_synth" =~ ^[01]$ ]] || fail "SMOKE_SYNTH must be either 0 or 1"
+[[ "$smoke_svc" =~ ^[01]$ ]] || fail "SMOKE_SVC must be either 0 or 1"
+if [[ "$smoke_svc" == 1 && "$smoke_synth" == 1 ]]; then
+    fail "SMOKE_SVC=1 and SMOKE_SYNTH=1 cannot yet be combined; run the opt-in checks separately"
+fi
 
 command -v nextflow >/dev/null || fail "Nextflow is not installed"
 command -v docker >/dev/null || fail "Docker is not installed"
@@ -157,6 +162,11 @@ if [[ "$smoke_synth" == 1 ]]; then
     synth_args=(--synthstep true --synthdeg_pct 0.1)
 fi
 
+svc_args=(--mlstep false)
+if [[ "$smoke_svc" == 1 ]]; then
+    svc_args=(--mlstep true)
+fi
+
 # The relaxed test-only anchor threshold gives the main smoke run stable,
 # nonempty anchor sets. Focused checks below cover the zero- and low-anchor cases.
 (
@@ -173,7 +183,7 @@ fi
         --nperms "$smoke_nperms" \
         --truecutoff 0.05 \
         "${synth_args[@]}" \
-        --mlstep false \
+        "${svc_args[@]}" \
         --pareml true \
         -w "$work_dir" \
         -with-trace "$log_dir/trace.tsv"
@@ -188,6 +198,12 @@ require_file() {
 require_pdf() {
     require_file "$1"
     LC_ALL=C head -c 5 "$1" | grep -q '^%PDF-' || fail "not a valid PDF: $1"
+}
+
+require_png() {
+    require_file "$1"
+    png_signature="$(od -An -tx1 -N8 "$1" | tr -d '[:space:]')"
+    [[ "$png_signature" == "89504e470d0a1a0a" ]] || fail "not a valid PNG: $1"
 }
 
 csv_value() {
@@ -1045,6 +1061,130 @@ verify_quasi_trace_keys() {
     done
 }
 
+# Verify the opt-in SVC run without adding any work to the default non-ML smoke path.
+verify_svc_trace_keys() {
+    basic_matches="$(awk -F '\t' '
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "name") name_column = i
+                if ($i == "status") status_column = i
+            }
+            if (!name_column || !status_column) exit 2
+            next
+        }
+        index($(name_column), "SVC_BASIC") && $(status_column) == "COMPLETED" {
+            matches += 1
+        }
+        END { print matches + 0 }
+    ' "$log_dir/trace.tsv")" || fail "could not parse the SVC basic task from the trace"
+    [[ "$basic_matches" -eq 1 ]] ||
+        fail "expected one completed SVC_BASIC task, found $basic_matches"
+
+    for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
+        expected_tag="SVC_PERMUTE (replicate=$replicate_id)"
+        permute_matches="$(awk -F '\t' -v expected="$expected_tag" '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "name") name_column = i
+                    if ($i == "status") status_column = i
+                }
+                if (!name_column || !status_column) exit 2
+                next
+            }
+            index($(name_column), expected) && $(status_column) == "COMPLETED" {
+                matches += 1
+            }
+            END { print matches + 0 }
+        ' "$log_dir/trace.tsv")" || fail "could not parse the SVC permutation task from the trace"
+        [[ "$permute_matches" -eq 1 ]] ||
+            fail "expected one completed task for $expected_tag, found $permute_matches"
+    done
+}
+
+verify_svc_outputs() {
+    svc_output_dir="$output_dir/svctables"
+    [[ -d "$svc_output_dir" ]] || fail "enabled SVC output directory is missing"
+    [[ -f "$repo_dir/bin/zuzu_svc.py" ]] || fail "the SVC model helper is missing"
+
+    svc_validation_dir="$smoke_root/svc-validation"
+    svc_validation_artifacts="$svc_validation_dir/artifacts"
+    svc_validation_sheets="$svc_validation_dir/sheets"
+    mkdir -p "$svc_validation_artifacts" "$svc_validation_sheets"
+    cp "$smoke_counts" "$svc_validation_dir/raw_counts.tsv"
+    cp "$clean_counts" "$svc_validation_dir/analysis_counts.csv"
+    cp "$clean_sheet" "$svc_validation_sheets/svc_basic.csv"
+
+    svc_suffixes=(
+        table.csv
+        curve.csv
+        folds.csv
+        fs.png
+        model.pickle
+        metadata.json
+        n_selected_features.txt
+    )
+    svc_prefixes=(svc_basic)
+    for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
+        svc_prefixes+=("svc_permute_replicate_$replicate_id")
+    done
+
+    for svc_prefix in "${svc_prefixes[@]}"; do
+        for svc_suffix in "${svc_suffixes[@]}"; do
+            svc_artifact="$svc_output_dir/${svc_prefix}_${svc_suffix}"
+            require_file "$svc_artifact"
+            cp -L "$svc_artifact" "$svc_validation_artifacts/"
+        done
+        require_png "$svc_output_dir/${svc_prefix}_fs.png"
+    done
+
+    staged_permutation_sheets=0
+    while IFS= read -r metadata_file; do
+        permutation_dir="${metadata_file%/*}"
+        replicate_id="$(awk -F',' '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    gsub(/^"|"$/, "", $i)
+                    if ($i == "replicate") replicate_column = i
+                }
+                if (!replicate_column) exit 2
+                next
+            }
+            NR == 2 {
+                value = $(replicate_column)
+                gsub(/^"|"$/, "", value)
+                print value
+                found = 1
+                next
+            }
+            END { if (!found || NR != 2) exit 3 }
+        ' "$metadata_file")" || fail "could not read SVC permutation replicate metadata"
+        [[ "$replicate_id" =~ ^[1-9][0-9]*$ ]] ||
+            fail "invalid SVC permutation replicate: $replicate_id"
+        require_file "$permutation_dir/samplesheet_perm.csv"
+        cp "$permutation_dir/samplesheet_perm.csv" \
+            "$svc_validation_sheets/svc_permute_replicate_$replicate_id.csv"
+        ((staged_permutation_sheets += 1))
+    done < <(find "$work_dir" -mindepth 3 -maxdepth 3 -type f -name 'permutation_metadata.csv' -print | sort)
+    [[ "$staged_permutation_sheets" -eq "$smoke_nperms" ]] ||
+        fail "expected $smoke_nperms SVC permutation sample sheets, found $staged_permutation_sheets"
+
+    svc_container="$(sed -n "s/^process.container[[:space:]]*=[[:space:]]*'\([^']*\)'[[:space:]]*$/\1/p" \
+        "$repo_dir/nextflow.config" | head -n 1)"
+    [[ -n "$svc_container" ]] || fail "could not determine the SVC container from nextflow.config"
+
+    if ! docker run --rm --network none --read-only --tmpfs /tmp \
+        -e PYTHONDONTWRITEBYTECODE=1 \
+        -v "$svc_validation_dir:/validation:ro" \
+        -v "$repo_dir/bin:/zuzu-bin:ro" \
+        -v "$repo_dir/tests:/zuzu-tests:ro" \
+        "$svc_container" \
+        python3 /zuzu-tests/verify_svc_smoke.py \
+        "$smoke_nperms" "$smoke_reflevel" "$smoke_altlevel"
+    then
+        fail "SVC artifact or saved-model validation failed"
+    fi
+}
+
 for smoke_pdf in \
     QC_plots.pdf \
     permute_plot.pdf \
@@ -1077,7 +1217,9 @@ else
             fail "disabled synthetic output was published: $disabled_synth_output"
     done
 fi
-[[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
+if [[ "$smoke_svc" == 0 ]]; then
+    [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
+fi
 require_file "$log_dir/trace.tsv"
 verify_filter_warning
 locate_clean_outputs
@@ -1088,6 +1230,10 @@ verify_permutation_trace_keys
 verify_quasi_trace_keys
 verify_quasi_anchor_contract
 verify_quasi_metrics
+if [[ "$smoke_svc" == 1 ]]; then
+    verify_svc_trace_keys
+    verify_svc_outputs
+fi
 if [[ "$smoke_synth" == 1 ]]; then
     verify_fullsynth_datasets
     verify_fullsynth_metrics
@@ -1119,6 +1265,24 @@ if [[ "$smoke_nperms" -ge 5 ]]; then
     cp -L "$output_dir/permute_violins.pdf" "$plot_dir/permute_violins.pdf"
 else
     rm -f "$plot_dir/permute_violins.pdf"
+fi
+
+svc_plot_dir="$plot_dir/svc"
+if [[ "$smoke_svc" == 1 ]]; then
+    case "$svc_plot_dir" in
+        "$plot_dir"/svc) rm -rf -- "$svc_plot_dir" ;;
+        *) fail "refusing to refresh unexpected SVC artifact directory: $svc_plot_dir" ;;
+    esac
+    mkdir -p "$svc_plot_dir"
+    for svc_artifact in "$output_dir"/svctables/svc_*; do
+        [[ -e "$svc_artifact" ]] || fail "no SVC artifacts were available to retain"
+        cp -L "$svc_artifact" "$svc_plot_dir/"
+    done
+else
+    case "$svc_plot_dir" in
+        "$plot_dir"/svc) rm -rf -- "$svc_plot_dir" ;;
+        *) fail "refusing to remove unexpected SVC artifact directory: $svc_plot_dir" ;;
+    esac
 fi
 
 printf 'Smoke-test artifacts retained at: %s\n' "$plot_dir"

@@ -9,7 +9,9 @@ process CLEANINPUTS {
     val reflevel
 
     output:
-    tuple path("samplesheet.csv"), path("countsframe_clean.csv")
+    tuple path("samplesheet.csv"), path("countsframe_clean.csv"), emit: cleaned
+    path("svc_library_sizes.csv"), emit: svc_library_sizes
+    path("svc_library_genes.csv"), emit: svc_library_genes
 
     script:
     """
@@ -50,6 +52,13 @@ process CLEANINPUTS {
       stop("CPM filtering requires every sample to have a positive library size")
     }
 
+    # Retain the pre-filter normalization universe for the SVC branch
+    svc.library.sizes = data.frame(
+      sample = colnames(countsframe),
+      library_size = as.numeric(library.sizes)
+    )
+    svc.library.genes = data.frame(gene = row.names(countsframe))
+
     minimum.samples = min(as.integer(table(samplesheet\$phenotype)))
     at.least.one.cpm = sweep(
       count.matrix,
@@ -83,5 +92,7 @@ process CLEANINPUTS {
 
     write.csv(samplesheet,"samplesheet.csv", row.names = FALSE)
     write.csv(countsframe.clean,"countsframe_clean.csv")
+    write.csv(svc.library.sizes, "svc_library_sizes.csv", row.names = FALSE)
+    write.csv(svc.library.genes, "svc_library_genes.csv", row.names = FALSE)
     """
 }

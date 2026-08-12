@@ -8,9 +8,7 @@ process SVC_FULLSYNTH_POSTPROCESS{
           val(refnum),
           val(altnum),
           val(x),
-          path(inframe),
-          path(plotframe), // Included as input for ease of naming, but not used here
-          path(pickle) // Included as input for ease of naming, but not used here
+          path(inframe)
 
     output:
     path("outframe.csv")
@@ -49,9 +47,9 @@ process SVC_FULLSYNTH_POSTPROCESS{
     ## Generate metrics 
 
     # Classify every gene in the fixed synthetic truth universe.
-    degs = row.names(subset(inframe,DEGstatus==1))
+    selected.features = row.names(subset(inframe, selected_feature == 1))
     truth = allgenes %in% truedegs
-    called = allgenes %in% degs
+    called = allgenes %in% selected.features
     true.positives = sum(called & truth)
     false.positives = sum(called & !truth)
     true.negatives = sum(!called & !truth)
@@ -72,7 +70,7 @@ process SVC_FULLSYNTH_POSTPROCESS{
 
     # Save outputs
     outframe = data.frame(
-      method = "SVC",
+      method = "SVC-RFECV candidates",
       power = power,
       FDP = FDP,
       youden_index = youden_index,
