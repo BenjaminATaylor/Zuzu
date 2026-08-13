@@ -17,10 +17,14 @@ process SVC_BASIC {
   path "svc_basic_model.pickle", emit: model
   path "svc_basic_metadata.json", emit: metadata
   path "svc_basic_n_selected_features.txt", emit: nFeatures
+  path "svc_basic_n_supported_features.txt", emit: nSupported
+  path "svc_basic_gate.csv", emit: gate
+  path "svc_basic_gate_null.csv", emit: gateNull
+  path "svc_basic_gate.png", emit: gatePlot
 
   script:
   """
-  # Fit the baseline SVC-RFECV procedure using pre-filter library sizes
+  # Fit the baseline adaptive SVC RFE-CV procedure using pre-filter library sizes
   zuzu_svc.py \
     --samplesheet "$samplesheet" \
     --counts "$countsframe" \
@@ -33,8 +37,14 @@ process SVC_BASIC {
     --folds '${params.svc_folds}' \
     --scoring '${params.svc_scoring}' \
     --seed '${params.svc_seed}' \
-    --step '${params.stepsize}' \
+    --coarse-grid '${params.svc_coarse_grid}' \
+    --refinement-points '${params.svc_refinement_points}' \
     --n-jobs '${params.njobs}' \
+    --gate true \
+    --gate-permutations '${params.svc_gate_permutations}' \
+    --gate-alpha '${params.svc_gate_alpha}' \
+    --gate-seed '${params.svc_gate_seed}' \
+    --gate-early-stop '${params.svc_gate_early_stop}' \
     --analysis-type basic \
     --output-prefix svc_basic
   """

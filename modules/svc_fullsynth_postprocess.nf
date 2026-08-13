@@ -47,7 +47,14 @@ process SVC_FULLSYNTH_POSTPROCESS{
     ## Generate metrics 
 
     # Classify every gene in the fixed synthetic truth universe.
-    selected.features = row.names(subset(inframe, selected_feature == 1))
+    if(!"supported_feature" %in% names(inframe)){
+      stop("SVC output does not contain the Stage 2 supported-feature status")
+    }
+    if(any(is.na(inframe\$supported_feature)) ||
+       any(!inframe\$supported_feature %in% c(0, 1))){
+      stop("SVC supported-feature status must be complete and binary")
+    }
+    selected.features = row.names(subset(inframe, supported_feature == 1))
     truth = allgenes %in% truedegs
     called = allgenes %in% selected.features
     true.positives = sum(called & truth)
@@ -66,11 +73,11 @@ process SVC_FULLSYNTH_POSTPROCESS{
     # 3. Youden's index: the true-positive rate minus the false-positive rate at the selected-feature threshold
     youden_index = (true.positives / n.truth) -
                    (false.positives / n.background)
-    metric.status = if(n.called == 0) "no_calls" else "ok"
+    metric.status = if(n.called == 0) "no_predictive_signal" else "ok"
 
     # Save outputs
     outframe = data.frame(
-      method = "SVC-RFECV candidates",
+      method = "SVC RFE-CV supported signature",
       power = power,
       FDP = FDP,
       youden_index = youden_index,

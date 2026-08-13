@@ -27,12 +27,16 @@ process SVC_FULLSYNTH {
   path "svc_fullsynth_*_model.pickle", emit: model
   path "svc_fullsynth_*_metadata.json", emit: metadata
   path "svc_fullsynth_*_n_selected_features.txt", emit: nFeatures
+  path "svc_fullsynth_*_n_supported_features.txt", emit: nSupported
+  path "svc_fullsynth_*_gate.csv", emit: gate
+  path "svc_fullsynth_*_gate_null.csv", emit: gateNull
+  path "svc_fullsynth_*_gate.png", emit: gatePlot
 
   script:
   depth_token = depth.toLong()
   output_prefix = "svc_fullsynth_depth_${depth_token}_ref_${refnum}_alt_${altnum}_replicate_${x}"
   """
-  # Fit SVC-RFECV without changing the existing full-synthetic dataset
+  # Fit adaptive SVC RFE-CV without changing the existing full-synthetic dataset
   zuzu_svc.py \
     --samplesheet "$samplesheet" \
     --counts "$countsframe" \
@@ -43,8 +47,14 @@ process SVC_FULLSYNTH {
     --folds '${params.svc_folds}' \
     --scoring '${params.svc_scoring}' \
     --seed '${params.svc_seed}' \
-    --step '${params.stepsize}' \
+    --coarse-grid '${params.svc_coarse_grid}' \
+    --refinement-points '${params.svc_refinement_points}' \
     --n-jobs '${params.njobs}' \
+    --gate true \
+    --gate-permutations '${params.svc_gate_permutations}' \
+    --gate-alpha '${params.svc_gate_alpha}' \
+    --gate-seed '${params.svc_gate_seed}' \
+    --gate-early-stop '${params.svc_gate_early_stop}' \
     --analysis-type fullsynthetic \
     --replicate '${x}' \
     --depth '${depth}' \

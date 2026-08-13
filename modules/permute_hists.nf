@@ -11,7 +11,7 @@ process PERMUTE_HISTS{
 
   output:
   path 'permute_hist.pdf'
-  path 'permute_violins.pdf'
+  path 'permute_violins.pdf', optional: true
 
   script:
   """
@@ -47,7 +47,7 @@ process PERMUTE_HISTS{
                         edger.permdegs,
                         wilcox.permdegs,
                         SVC.permfeatures) %>%
-      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon", "SVC-RFECV candidates")) %>%
+      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon", "SVC RFE-CV candidates")) %>%
       melt()
   } else {
     permhist.in = cbind(deseq.permdegs,
@@ -121,8 +121,10 @@ process PERMUTE_HISTS{
           width = 20, height = 12, units = "cm")
 
   } else {
-    dummy = NA
-    save(dummy, file = "permute_violins.pdf")
+    message(
+      "Skipping permute_violins.pdf: this diagnostic requires at least five permutations; ",
+      "this run used ", as.integer(nperms), "."
+    )
   }
   """
 }

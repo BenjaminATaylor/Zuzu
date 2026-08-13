@@ -68,7 +68,7 @@ process FULLSYNTH_PLOTS {
     wilcox.synth.input = read_fullsynths("wilcox", "Wilcoxon")
 
     if("$params.mlstep" == "true"){
-        svc.synth.input = read_fullsynths("svc", "SVC-RFECV candidates")
+        svc.synth.input = read_fullsynths("svc", "SVC RFE-CV supported signature")
         fullsynth.results = bind_rows(deseq.synth.input,
                                       edger.synth.input,
                                       wilcox.synth.input,
@@ -100,7 +100,7 @@ process FULLSYNTH_PLOTS {
             },
             n_valid = sum(is.finite(value)),
             n_total = n(),
-            n_no_calls = sum(metric_status == "no_calls"),
+            n_no_calls = sum(metric_status %in% c("no_calls", "no_predictive_signal")),
             .groups = "drop"
         )
     write.csv(fullsynth.summary, "synth_summary.csv", row.names = FALSE)
@@ -129,12 +129,18 @@ process FULLSYNTH_PLOTS {
         "1-FDP" = "FDP",
         "Youden's index" = "youden_index"
     )
+    # Show empty calls or unsupported signatures so 1-FDP is not misleading
     gg.synth.input = gg.synth.input %>%
-        mutate(plot_label = ifelse(
-            is.na(mean),
-            paste0("NA\n(n=0/", n_total, ")"),
-            paste0(mean, "\n(n=", n_valid, "/", n_total, ")")
-        ))
+        mutate(no.call.label = ifelse(
+                   n_no_calls > 0,
+                   paste0("\n(no call/signal=", n_no_calls, "/", n_total, ")"),
+                   ""
+               ),
+               plot_label = ifelse(
+                   is.na(mean),
+                   paste0("NA\n(n=0/", n_total, ")", no.call.label),
+                   paste0(mean, "\n(n=", n_valid, "/", n_total, ")", no.call.label)
+               ))
 
     gg.synth = ggplot(gg.synth.input, aes(x = depth, y = sample_size)) +
         geom_tile(aes(fill = mean), color = "gray20", size = .75, width = 1, height = 1) +

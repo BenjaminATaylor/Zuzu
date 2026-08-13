@@ -27,11 +27,17 @@ The README now states this distinction, but process outputs still use the fields
 
 Impact: quasi-permutation results can still be mistaken for estimates of biological sensitivity, false discovery, or cross-method performance. Outputs and plots should use anchor-recovery and background-call terminology and make their within-method interpretation explicit.
 
-### KI-013: SVC has no no-signal gate or gene-wise error control
+### KI-013: SVC supported features have no gene-wise error control
 
-Stage 1 now labels the output as SVC-RFECV candidate features, keeps it distinct from conventional DEG calls, and describes the selected count as the smallest cross-validated maximum rather than an inflection point. However, RFECV still retains at least one feature, its internal maximum is not independent predictive performance, and it produces neither gene-wise p-values nor false-discovery-rate control.
+Stage 2 now permutation-tests the complete adaptive RFE-CV optimisation and returns an empty supported set when the model-level gate fails. Passing rejects the global phenotype-label exchangeability null under the gate assumptions, but it does not show that each retained feature is necessary or individually associated. SVC features still have neither gene-wise p-values nor false-discovery-rate control, and the internal RFE-CV maximum remains unsuitable as an estimate of independent predictive performance.
 
-Impact: Stage 1 can report an exploratory predictive candidate set, but it cannot determine that phenotype signal exists or promote that set to a supported signature. The separately specified Stage 2 no-signal gate is still required before that stronger interpretation.
+Impact: the gate prevents a forced RFE-CV candidate from automatically becoming a supported result, but a supported SVC signature remains a model-level exploratory result rather than a set of FDR-controlled DEGs.
+
+### KI-037: Coarse SVC elimination can make the selected signature grid-dependent
+
+The adaptive SVC search makes high-dimensional inputs more tractable by scoring at most 21 coarse and eight refined feature counts under the default reference grid. A coarse jump can nevertheless remove many genes using one fitted coefficient ranking. Refinement starts from the saved state immediately above the coarse maximum, so it cannot reconsider genes removed earlier. This is especially relevant when many genes are correlated and several different signatures predict similarly well. Repeating the complete adaptive search for every signal-gate permutation preserves the model-level null comparison, but it does not establish stability of the selected genes.
+
+Impact: the selected signature can depend materially on the reference grid and its elimination jumps and need not match a fine fixed-step RFE result. Runtime, boundary behaviour, and feature stability should be assessed on representative real data; materially different grids must be recorded and treated as different procedures.
 
 ### KI-014: Only simple unpaired two-group designs are supported
 
@@ -75,7 +81,7 @@ Only `samplesheet`, `countsframe`, and `reflevel` receive explicit presence chec
 - `nperms`, including a positive-integer check
 - Boolean types for `mlstep`, `synthstep`, and `pareml`; arbitrary nonempty strings can be truthy in workflow conditionals while comparing unequal to `"true"` inside generated scripts
 
-The Stage 1 SVC parameters now have shared defaults and validate `C`, class weighting, scoring, fold count, seed, RFE step, and job count before fitting, but this does not validate the remaining workflow-wide parameters above.
+The Stage 1 and 2 SVC parameters now have shared defaults and validate `C`, class weighting, scoring, fold count, seeds, the coarse reference grid, refinement-point count, job count, gate permutation count, gate alpha, and early-stopping mode before fitting, but this does not validate the remaining workflow-wide parameters above.
 
 Impact: invalid values can produce malformed scripts, unexpected task counts or seeds, inconsistent branch behaviour, misleading benchmarks, or late task failures.
 
@@ -87,9 +93,9 @@ Impact: rebuilding or rerunning later can change behaviour and numerical results
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises non-ML full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including their estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results, automate the combined SVC-plus-synthetic run, or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including the adaptive coarse/refined search, model-level signal gate, estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. Combining both flags also checks the nine gated full-synthetic SVC paths and their shared summaries. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
-Impact: major workflow breakage and metric inconsistencies are easier to detect, but dependency-driven numerical changes, full-synthetic SVC regressions, and failures outside the covered invariants can still go unnoticed.
+Impact: major workflow breakage and metric inconsistencies are easier to detect, but dependency-driven numerical changes and failures outside the covered invariants can still go unnoticed.
 
 ### KI-023: Run provenance is incomplete
 
@@ -114,12 +120,6 @@ Impact: moving the repository or cleaning the work directory breaks published re
 [`PERMUTE_PLOTS`](modules/permute_plots.nf) accepts collected file paths as `val` inputs and parses their string representation rather than staging a path collection.
 
 Impact: the implementation relies on the whole work root being visible to tasks and is fragile on scratch/remote executors or paths containing spaces and commas.
-
-### KI-027: Small permutation runs publish a non-PDF with a PDF extension
-
-When `nperms < 5`, [`PERMUTE_HISTS`](modules/permute_hists.nf) saves an RData object as `permute_violins.pdf`.
-
-Impact: the published file is not a valid PDF and will fail in document viewers and downstream tooling.
 
 ### KI-028: Dummy ML inputs use a nonexistent sentinel path
 
@@ -201,7 +201,7 @@ Resolved 2026-08-11. Whenever a quasi or full-synthetic analyzer evaluates metri
 
 [`DATA_FULLSYNTH`](modules/data_fullsynth.nf) now rejects empty generated matrices, duplicate identifiers, truth genes absent from the generated count matrix, and synthetic benchmarks lacking either a true or background class. The analyzers repeat the truth-universe checks defensively. SVC pare mode records unmodelled genes as uncalled so debugging does not change the benchmark denominator.
 
-[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show the valid denominator. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, zero- and low-anchor statuses, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
+[`QUASI_PLOTS`](modules/quasi_plots.nf) publishes the combined per-replicate `quasi_results.csv`. [`FULLSYNTH_PLOTS`](modules/fullsynth_plots.nf) publishes `synth_results.csv` and an untransformed, full-precision `synth_summary.csv`; each summary records `n_valid`, `n_total`, and `n_no_calls`, while plot labels show both the valid denominator and any no-call/no-signal count. Missing metrics are averaged only over explicitly counted finite replicates, with an all-missing group retained as `NA`. The standard smoke test verifies the quasi confusion-matrix identities, metric formulas and bounds, zero- and low-anchor statuses, row keys, and combined output; the opt-in synthetic path verifies the corresponding per-replicate results, shared truth universes, summaries, and plot.
 
 ### KI-009: The null-permutation acceptance rule assumed approximately balanced groups
 
@@ -221,7 +221,7 @@ The opt-in synthetic smoke validator checks every generated sample-sheet/count-m
 
 ### KI-012: SVC preprocessing leaked information across validation folds
 
-Resolved 2026-08-11. The three active SVC modules now call one shared implementation that applies `log2(CPM + 1)` and passes unscaled expression into `RFECV`. Its estimator is a scikit-learn `Pipeline` containing `StandardScaler` followed by a linear SVC, so every feature-elimination fit learns scaling from its own training fold. Ordinary and constrained-permutation fits use the pre-filter library sizes already calculated by `CLEANINPUTS`; full-synthetic fits use all genes in the unchanged emitted synthetic count matrix.
+Resolved 2026-08-11. The three active SVC modules now call one shared implementation that applies `log2(CPM + 1)` and passes unscaled expression into an adaptive RFE-CV search. Every feature-elimination fit uses a scikit-learn `Pipeline` containing `StandardScaler` followed by a linear SVC, so scaling is learned from that fit's training fold. Ordinary and constrained-permutation fits use the pre-filter library sizes already calculated by `CLEANINPUTS`; full-synthetic fits use all genes in the unchanged emitted synthetic count matrix.
 
 The procedure explicitly maps the requested reference to class 0, uses balanced class weights and balanced accuracy, and records shuffled seeded stratified folds. It rejects a phenotype group smaller than the requested fold count rather than silently constructing an unsupported split. Its fixed defaults are exposed as validated parameters and retained in metadata rather than treated as immutable constants.
 
@@ -229,15 +229,21 @@ Every run now publishes a complete candidate-feature table, fold assignments, cu
 
 ### KI-021: Current HEAD lacked a documented clean end-to-end run
 
-Resolved 2026-08-11. A cold Stage 1 run completed the baseline, constrained-permutation, quasi-permutation, and existing full-synthetic branches with `mlstep=true`, `synthstep=true`, `pareml=true`, and one replicate. It executed one baseline SVC fit, one constrained-permutation fit, all nine SVC full-synthetic fits, and all nine SVC postprocessors without cache reuse. The combined synthetic table contained nine rows for each of DESeq2, edgeR, Wilcoxon, and `SVC-RFECV candidates` over the unchanged 11+9, 20+16, and 30+24 by three-depth grid.
+Resolved 2026-08-12. A cold Stage 2 run completed the baseline, constrained-permutation, quasi-permutation, and existing full-synthetic branches with `mlstep=true`, `synthstep=true`, `pareml=true`, one replicate, and 19 gate permutations for structural testing. It executed one gated baseline adaptive SVC fit, one ungated constrained-permutation fit, all nine gated SVC full-synthetic fits, and all nine SVC postprocessors without cache reuse. The combined synthetic table contained nine rows for each of DESeq2, edgeR, Wilcoxon, and `SVC RFE-CV supported signature` over the unchanged 11+9, 20+16, and 30+24 by three-depth grid. The repeatable combined smoke path verifies each gate against its candidate/support table and combined result.
 
 This establishes mechanical completion of the current pared workflow, not benchmark-scale runtime, numerical reproducibility across dependency versions, or scientific validation of SVC as a DEG procedure.
 
+### KI-027: Small permutation runs published a non-PDF with a PDF extension
+
+Resolved 2026-08-13. [`PERMUTE_HISTS`](modules/permute_hists.nf) now declares `permute_violins.pdf` as an optional output and omits it, with an explanatory task message, when fewer than five permutations are available. Runs with five or more permutations still produce the intended violin plot as a genuine PDF.
+
+The smoke test requires the file to be absent below the threshold and verifies its PDF signature at or above the threshold. The always-available `permute_hist.pdf` remains the descriptive permutation diagnostic for small runs.
+
 ### KI-030: SVC feature-selection plots used the wrong x-axis values
 
-Resolved 2026-08-11. SVC curve tables and plots now use the actual feature counts evaluated by RFECV. The implementation reads scikit-learn's `n_features` result when available and reconstructs the same ascending count sequence for older releases, then verifies that it aligns with the score vector. For example, 100 genes at a step of 50 are plotted at 1, 50, and 100 rather than at evaluation indices 1, 2, and 3.
+Resolved 2026-08-11. SVC curve tables and plots now use the actual feature counts evaluated by the adaptive RFE-CV search. They distinguish the coarse search from the local refinement branch and retain the resolved coarse winner, branch bounds, and evaluated schedules rather than substituting evaluation indices for gene counts.
 
-The selected point is marked explicitly and verified to be the smallest evaluated feature set at the maximum mean fold score. Every fold score and its mean and standard deviation are retained alongside the plot. The implementation passed direct checks under scikit-learn 1.4 and the pipeline image's scikit-learn 1.8.
+The selected point is marked explicitly and is the smallest evaluated feature set at the maximum fold-score sum. Every fold score and its mean and standard deviation are retained alongside the plot. With the default tunable reference grid, each label assignment scores at most 21 coarse and eight refined feature counts.
 
 ### KI-035: The quasi plot had an incorrect y-axis label
 

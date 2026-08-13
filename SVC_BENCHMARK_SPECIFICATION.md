@@ -1,6 +1,6 @@
 # Staged SVC development and benchmark specification
 
-Status: Stage 1 implemented. Stage 2 remains a separately approved exploratory extension, and Stage 3 remains a separate confirmatory-benchmark proposal.
+Status: Stages 1 and 2 implemented. Stage 3 remains a separate confirmatory-benchmark proposal.
 
 ## 1. Purpose
 
@@ -44,14 +44,14 @@ The following terms must be kept distinct:
 
 - **Selected gene:** the general term for any gene returned by a method.
 - **Conventional DEG:** a gene selected by a gene-wise statistical test at a stated adjusted-p-value threshold.
-- **SVC candidate feature:** a gene retained by the RFECV procedure.
+- **SVC candidate feature:** a gene retained by the adaptive RFE-CV procedure.
 - **Supported SVC signature:** the candidate feature set when the Stage 2 model-level signal gate passes.
 - **Truth gene:** for the primary synthetic comparison, a gene with a non-zero phenotype effect on its expected normalised abundance.
 - **Predictive signature:** a set of genes used together to predict phenotype.
 
 Stage 1 may report:
 
-> SVC-RFECV candidate features selected for discriminating the two phenotype labels.
+> SVC RFE-CV candidate features selected for discriminating the two phenotype labels.
 
 It may also report exploratory overlap, power, FDP, and Youden's index against the truth supplied by the existing full-synthetic step, provided those results are explicitly described as recovery by a predictive feature selector.
 
@@ -64,7 +64,7 @@ Only Stage 3 can support a condition-specific claim that SVC behaved as an empir
 - interpreting an SVC coefficient as a log fold change;
 - calling every retained feature individually necessary for prediction;
 - calling every removed gene non-predictive or a cause of overfitting;
-- treating the internal RFECV score as independent predictive performance;
+- treating the internal RFE-CV score as independent predictive performance;
 - claiming that good phenotype prediction proves good DEG recovery.
 
 SVC outputs must use a field such as `selected_feature`, not `DEGstatus`. “More reliable” must always name the relevant outcome: truth recovery, false selection, stability, or independent prediction.
@@ -86,7 +86,7 @@ SVC must not be fitted directly to unnormalised raw counts. The rehabilitated pr
 1. calculate sample library sizes from all available pre-analysis genes;
 2. transform expression to `log2(CPM + 1)`;
 3. restrict the matrix to the common filtered gene universe;
-4. fit `StandardScaler` separately inside every RFECV training fold.
+4. fit `StandardScaler` separately inside every RFE-CV training fold.
 
 Scaling and the linear SVC must be contained in a scikit-learn `Pipeline`. Validation samples must not influence their own fitted centring or scaling.
 
@@ -95,22 +95,27 @@ Scaling and the linear SVC must be contained in a scikit-learn `Pipeline`. Valid
 The proposed initial procedure is:
 
 - a linear SVC;
-- an RFECV importance getter that reads `coef_` from the fitted SVC pipeline step;
+- squared coefficients from the fitted SVC pipeline step as the elimination importance;
 - `C = 1`;
 - `class_weight = "balanced"`;
-- balanced accuracy as the RFECV score;
+- balanced accuracy as the RFE-CV score;
 - five stratified, shuffled, and seeded folds;
 - explicit reference encoding as class 0 and alternative encoding as class 1;
-- `step = 50` genes;
-- `min_features_to_select = 1`.
+- the 21-count reference grid `1, 2, 3, 5, 8, 13, 20, 32, 50, 80, 125, 200, 320, 500, 800, 1250, 2000, 3200, 5000, 8000, 10000`;
+- eight adaptive refinement points;
+- a minimum of one retained feature.
 
 Five folds are used only when the smaller phenotype group contains enough independent samples. Unsupported designs must fail clearly. Paired, repeated, or otherwise related samples require group-aware splitting and are outside the initial two-independent-group implementation.
 
-The selected feature count is the evaluated count with the highest mean fold score. Ties are resolved in favour of the smaller set. This is the **CV-optimal feature count**, not a statistical inflection point and not evidence that only overfitting genes have been removed.
+The supplied coarse counts are a reference grid whose final value defines its reference feature total. For an input containing a different number of modelled genes, each reference count is mapped to the same relative position on the log scale, then rounded and deduplicated; one and the complete feature count are always included. Very small feature universes are searched exhaustively.
 
-Plots must use the actual evaluated feature counts on the x-axis. The elimination step, fold allocation, score, chosen count, and random seeds must be retained.
+The smallest coarse count attaining the maximum fold-score sum defines the refinement neighbourhood. The procedure takes its immediate lower and upper coarse neighbours, using the winner itself at an endpoint, and generates up to eight new logarithmically spaced integer counts inside those bounds. Within each fold, refinement branches from that fold's saved upper-neighbour feature set and continues recursive elimination through the new counts in descending order. This avoids adding previously eliminated genes back into the model. Coarse points and refined points therefore belong to two recorded elimination paths rather than one uninterrupted curve.
 
-These are reference defaults for Stage 1, not immutable scientific constants. The implementation should expose `C`, fold count, class weighting, RFE step, and scoring rule as validated parameters and record the resolved values in every run.
+The selected feature count is the smallest of at most 21 coarse and eight refined counts attaining the maximum fold-score sum. This is the **CV-optimal feature count**, not a statistical inflection point and not evidence that only overfitting genes have been removed.
+
+Plots must use the actual evaluated feature counts on the x-axis and distinguish coarse from refined points. The resolved schedules, branch bounds, fold allocation, scores, chosen count and path, and random seeds must be retained.
+
+These are reference defaults for Stage 1, not immutable scientific constants. The implementation should expose `C`, fold count, class weighting, coarse reference grid, refinement-point count, and scoring rule as validated parameters and record the resolved values in every run.
 
 Parameters may be changed or tuned when there is a scientific or practical reason. The constraint is on **how** this is done:
 
@@ -121,7 +126,9 @@ Parameters may be changed or tuned when there is a scientific or practical reaso
 - synthetic truth labels, held-out test performance, and confirmatory results must not be used to choose the settings later reported on those same data;
 - results produced by materially different settings or tuning rules must retain those configurations and be compared as distinct procedures.
 
-`C` and class weighting are model hyperparameters and can be tuned within that framework. Fold count and scoring metric primarily define the validation question and should normally be chosen from the study design rather than selected because they give the most favourable result. RFE step is principally a runtime-versus-resolution choice, although it can change the selected set and must therefore be recorded.
+`C` and class weighting are model hyperparameters and can be tuned within that framework. Fold count and scoring metric primarily define the validation question and should normally be chosen from the study design rather than selected because they give the most favourable result. The coarse grid and refinement-point count are principally runtime-versus-resolution choices, although they change the search and potentially the selected set and must therefore be recorded.
+
+The coarse search reduces score evaluations, but its elimination jumps are themselves coarse. A large jump can remove many genes using one fitted ranking, and subsequent refinement cannot recover a gene eliminated before the saved upper-neighbour state. Adaptive refinement improves feature-count resolution near the coarse maximum; it does not reproduce the feature path from a fixed 50-gene step. Runtime, curve-boundary behaviour, and feature stability must be examined on representative data.
 
 Stage 1 uses the reference defaults without a hyperparameter search so that the initial change tests the corrected mechanics in isolation. A later tunable mode does not require the expanded Stage 3 benchmark, but it does require the safeguards above.
 
@@ -153,7 +160,7 @@ An opt-in SVC smoke path must verify that:
 
 - count columns and phenotype rows are identically ordered;
 - fold-level scaling is not fitted on validation samples;
-- actual feature counts are plotted;
+- coarse and refined feature counts are plotted and labelled correctly;
 - reference and alternative classes are encoded explicitly;
 - both imbalanced phenotype directions work;
 - unsupported small-class designs fail clearly;
@@ -167,13 +174,13 @@ The current default smoke test continues to use `--mlstep false` and must remain
 
 ### 5.1 Purpose
 
-RFECV always retains at least its minimum feature count. A candidate set must therefore not automatically become a supported result.
+Recursive feature elimination always retains at least its minimum feature count. A candidate set must therefore not automatically become a supported result.
 
 Stage 2 adds a model-level gate entirely within the SVC branch. It does not redesign the full-synthetic generator and it does not replace the existing constrained-permutation analysis.
 
 ### 5.2 Gate procedure
 
-The proposed gate statistic is the maximum mean fold-level balanced accuracy on the RFECV curve. This optimised score is not an estimate of future predictive accuracy, but it can be used as a permutation-test statistic when the same optimisation is repeated for every permuted label vector.
+The proposed gate statistic is the maximum mean fold-level balanced accuracy over the complete adaptive RFE-CV search. This optimised score is not an estimate of future predictive accuracy, but it can be used as a permutation-test statistic when the same optimisation is repeated for every permuted label vector.
 
 Uniformly permute the training labels in a way permitted by the study design and repeat the complete SVC procedure, including any label-dependent filtering, scaling, hyperparameter tuning, recursive elimination, and maximisation over feature counts:
 
@@ -183,6 +190,8 @@ p = (1 + number of null scores at least as large as the observed score) /
 ```
 
 The proposed initial count is 99 permutations, giving p-value resolution of `0.01`. Observed and permuted runs use the same deterministic split-generation rule and seeds, with stratified folds regenerated for each label vector. A failing gate run may stop once enough exceedances make `p <= 0.05` impossible, but it must then report only `p > 0.05`.
+
+Every permuted label vector must run the coarse search, choose its own coarse maximum and refinement neighbourhood, and follow its own fold-specific refinement branches. Reusing the observed refinement neighbourhood for the null searches would give the observed labels a tailored optimisation and invalidate the comparison.
 
 If the gate passes, the complete-data candidate set becomes the supported SVC signature. If it fails, the supported set is empty and the public status is `no_predictive_signal`; the forced candidate set remains available only for diagnostics.
 
@@ -260,7 +269,7 @@ The primary operating-point comparison uses:
 - DESeq2 at adjusted `p <= 0.05`;
 - edgeR at adjusted `p <= 0.05`;
 - Wilcoxon with BH-adjusted `p <= 0.05`;
-- the locked, gated SVC-RFECV procedure, where “locked” may include a prespecified training-only tuning rule rather than identical realised hyperparameters in every replicate.
+- the locked, gated SVC RFE-CV procedure, where “locked” may include a prespecified training-only tuning rule rather than identical realised hyperparameters in every replicate.
 
 Each method begins from the same training-derived gene universe, while retaining the count representation required by its model.
 
@@ -336,7 +345,7 @@ Under the complete null, replicate FDP is one whenever any gene is selected and 
 empirical FDR = probability of selecting any gene
 ```
 
-Ungated RFECV must select at least one feature and consequently has null empirical FDR equal to one. This is why candidate features cannot automatically be treated as supported discoveries.
+Ungated RFE-CV must select at least one feature and consequently has null empirical FDR equal to one. This is why candidate features cannot automatically be treated as supported discoveries.
 
 ### 7.3 Selection stability
 
@@ -358,7 +367,7 @@ Independent-test balanced accuracy is the primary predictive metric. Report phen
 
 To compare the predictive utility of selected gene sets, pass every method's selected genes to the same fixed downstream classifier. The proposal is L2 logistic regression with `C = 1` and balanced class weights after training-derived `log2(CPM + 1)` transformation and scaling. If no genes are selected, use a prespecified no-information classifier rather than dropping the replicate.
 
-The native fitted SVC may also be evaluated, but that answers the separate question of how well the complete SVC procedure predicts. The internal RFECV score remains a tuning statistic and must never be presented as independent predictive performance.
+The native fitted SVC may also be evaluated, but that answers the separate question of how well the complete SVC procedure predicts. The internal RFE-CV score remains a tuning statistic and must never be presented as independent predictive performance.
 
 ## 8. Estimation and confirmatory decisions
 
@@ -422,8 +431,11 @@ Stage 2 tests verify that:
 
 - a clearly null fixture can return `no_predictive_signal`;
 - every gate permutation repeats feature-count optimisation;
+- gate allocations preserve phenotype margins, exclude the observed allocation, and reproduce from the recorded seed;
+- conservative score ties and early failure are handled correctly;
 - gate outputs distinguish candidate and supported features;
 - the existing constrained-permutation results are unchanged;
+- the gated full-synthetic tables, postprocessing, summaries, and plots agree;
 - a held-out dataset, where supplied for testing, cannot influence the gate.
 
 Stage 3 tests verify that:
@@ -455,5 +467,5 @@ Enabling or restoring `mlstep` must not implicitly enable Stage 3. No claim that
 - Guyon I, Weston J, Barnhill S, Vapnik V. [Gene Selection for Cancer Classification using Support Vector Machines](https://doi.org/10.1023/A:1012487302797). *Machine Learning*. 2002;46:389–422.
 - Ambroise C, McLachlan GJ. [Selection bias in gene extraction on the basis of microarray gene-expression data](https://pubmed.ncbi.nlm.nih.gov/11983868/). *PNAS*. 2002;99:6562–6566.
 - Meinshausen N, Bühlmann P. [Stability selection](https://stat.ethz.ch/Manuscripts/buhlmann/stabilityselection.pdf). *Journal of the Royal Statistical Society: Series B*. 2010;72:417–473.
-- scikit-learn. [RFECV documentation](https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.RFECV.html).
+- scikit-learn. [RFE documentation](https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.RFE.html).
 - scikit-learn. [Nested versus non-nested cross-validation](https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html).

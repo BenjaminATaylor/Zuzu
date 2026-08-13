@@ -24,8 +24,9 @@ fail() {
 [[ "$smoke_nperms" =~ ^[1-9][0-9]*$ ]] || fail "SMOKE_NPERMS must be a positive integer"
 [[ "$smoke_synth" =~ ^[01]$ ]] || fail "SMOKE_SYNTH must be either 0 or 1"
 [[ "$smoke_svc" =~ ^[01]$ ]] || fail "SMOKE_SVC must be either 0 or 1"
-if [[ "$smoke_svc" == 1 && "$smoke_synth" == 1 ]]; then
-    fail "SMOKE_SVC=1 and SMOKE_SYNTH=1 cannot yet be combined; run the opt-in checks separately"
+fullsynth_method_count=3
+if [[ "$smoke_svc" == 1 ]]; then
+    fullsynth_method_count=4
 fi
 
 command -v nextflow >/dev/null || fail "Nextflow is not installed"
@@ -164,7 +165,28 @@ fi
 
 svc_args=(--mlstep false)
 if [[ "$smoke_svc" == 1 ]]; then
-    svc_args=(--mlstep true)
+    # Nineteen permutations are the smallest structural gate test that can
+    # attain p = 0.05 when no null score equals or exceeds the observation.
+    expected_production_grid='1,2,3,5,8,13,20,32,50,80,125,200,320,500,800,1250,2000,3200,5000,8000,10000'
+    configured_production_grid="$(sed -n \
+        "s/^[[:space:]]*svc_coarse_grid[[:space:]]*=[[:space:]]*'\([^']*\)'[[:space:]]*$/\1/p" \
+        "$repo_dir/nextflow.config")"
+    configured_refinement_points="$(sed -n \
+        's/^[[:space:]]*svc_refinement_points[[:space:]]*=[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' \
+        "$repo_dir/nextflow.config")"
+    [[ "$configured_production_grid" == "$expected_production_grid" ]] ||
+        fail "the production SVC coarse grid differs from its 21-point contract"
+    [[ "$configured_refinement_points" == 8 ]] ||
+        fail "the production SVC refinement count differs from its eight-point contract"
+    svc_args=(
+        --mlstep true
+        --svc_coarse_grid 1,10,100
+        --svc_refinement_points 4
+        --svc_gate_permutations 19
+        --svc_gate_alpha 0.05
+        --svc_gate_seed 2718
+        --svc_gate_early_stop true
+    )
 fi
 
 # The relaxed test-only anchor threshold gives the main smoke run stable,
@@ -237,6 +259,34 @@ csv_value() {
             if (!found_row) {
                 exit 3
             }
+        }
+    ' "$csv_file"
+}
+
+single_row_csv_value() {
+    csv_file="$1"
+    wanted_column="$2"
+
+    awk -F',' -v wanted_column="$wanted_column" '
+        function unquote(value) {
+            sub(/^"/, "", value)
+            sub(/"$/, "", value)
+            return value
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                if (unquote($i) == wanted_column) value_column = i
+            }
+            if (!value_column) exit 2
+            next
+        }
+        NR == 2 {
+            print unquote($(value_column))
+            found_row = 1
+            next
+        }
+        END {
+            if (!found_row || NR != 2) exit 3
         }
     ' "$csv_file"
 }
@@ -749,10 +799,14 @@ verify_quasi_metrics() {
 }
 
 verify_fullsynth_metrics() {
-    expected_result_count=$((smoke_nperms * 3 * 3 * 3))
-    expected_summary_count=$((3 * 3 * 3 * 3))
+    expected_result_count=$((smoke_nperms * 3 * 3 * fullsynth_method_count))
+    expected_summary_count=$((3 * 3 * 3 * fullsynth_method_count))
 
-    awk -F',' -v expected_rows="$expected_result_count" -v expected_replicates="$smoke_nperms" '
+    awk -F',' \
+        -v expected_rows="$expected_result_count" \
+        -v expected_replicates="$smoke_nperms" \
+        -v include_svc="$smoke_svc" \
+        -v expected_methods="$fullsynth_method_count" '
         function absolute(value) { return value < 0 ? -value : value }
         function is_integer(value) { return value ~ /^[0-9]+$/ }
         function is_number(value) {
@@ -789,7 +843,9 @@ verify_fullsynth_metrics() {
             totalnum = $(column["totalnum"])
             depth = $(column["depth"])
 
-            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
+            is_svc = method == "SVC RFE-CV supported signature"
+            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon" &&
+                !(include_svc && is_svc)) exit 3
             if (!is_number(power) || !is_number(FDP) || !is_number(youden) ||
                 !is_number(depth)) exit 4
             if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
@@ -806,7 +862,10 @@ verify_fullsynth_metrics() {
             if (pair != "11:9" && pair != "20:16" && pair != "30:24") exit 7
             if (depth != 100000 && depth != 1000000 && depth != 10000000) exit 8
 
-            expected_status = n_called == 0 ? "no_calls" : "ok"
+            expected_status = "ok"
+            if (n_called == 0) {
+                expected_status = is_svc ? "no_predictive_signal" : "no_calls"
+            }
             expected_power = TP / n_truth
             expected_FDP = n_called == 0 ? 0 : FP / n_called
             expected_youden = expected_power - (FP / n_background)
@@ -830,27 +889,36 @@ verify_fullsynth_metrics() {
         }
         END {
             if (rows != expected_rows) exit 12
-            expected_per_method = expected_rows / 3
+            expected_per_method = expected_rows / expected_methods
             if (method_count["DESeq2"] != expected_per_method ||
                 method_count["edgeR"] != expected_per_method ||
                 method_count["Wilcoxon"] != expected_per_method) exit 13
+            if (include_svc &&
+                method_count["SVC RFE-CV supported signature"] != expected_per_method) exit 13
 
             expected_per_pair = expected_rows / 3
-            expected_per_method_pair = expected_rows / 9
+            expected_per_method_pair = expected_rows / (3 * expected_methods)
             split("11:9 20:16 30:24", expected_pairs, " ")
-            split("DESeq2 edgeR Wilcoxon", expected_methods, " ")
+            method_names[1] = "DESeq2"
+            method_names[2] = "edgeR"
+            method_names[3] = "Wilcoxon"
+            if (include_svc) method_names[4] = "SVC RFE-CV supported signature"
             for (i in expected_pairs) {
                 pair = expected_pairs[i]
                 if (pair_count[pair] != expected_per_pair) exit 14
-                for (j in expected_methods) {
-                    method = expected_methods[j]
+                for (j = 1; j <= expected_methods; j++) {
+                    method = method_names[j]
                     if (method_pair_count[method SUBSEP pair] != expected_per_method_pair) exit 15
                 }
             }
         }
     ' "$output_dir/synth_results.csv" || fail "invalid synthetic per-replicate metrics"
 
-    awk -F',' -v expected_rows="$expected_summary_count" -v expected_replicates="$smoke_nperms" '
+    awk -F',' \
+        -v expected_rows="$expected_summary_count" \
+        -v expected_replicates="$smoke_nperms" \
+        -v include_svc="$smoke_svc" \
+        -v expected_methods="$fullsynth_method_count" '
         function is_integer(value) { return value ~ /^[0-9]+$/ }
         function is_number(value) {
             return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
@@ -878,7 +946,8 @@ verify_fullsynth_metrics() {
             n_total = $(column["n_total"])
             n_no_calls = $(column["n_no_calls"])
 
-            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon") exit 3
+            if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon" &&
+                !(include_svc && method == "SVC RFE-CV supported signature")) exit 3
             if (variable != "power" && variable != "FDP" && variable != "youden_index") exit 4
             if (!is_number(mean) || !is_integer(n_valid) || !is_integer(n_total) ||
                 !is_integer(n_no_calls) || !is_integer(refnum) || !is_integer(altnum) ||
@@ -904,14 +973,17 @@ verify_fullsynth_metrics() {
             if (rows != expected_rows) exit 13
 
             expected_per_pair = expected_rows / 3
-            expected_per_method_pair = expected_rows / 9
+            expected_per_method_pair = expected_rows / (3 * expected_methods)
             split("11:9 20:16 30:24", expected_pairs, " ")
-            split("DESeq2 edgeR Wilcoxon", expected_methods, " ")
+            method_names[1] = "DESeq2"
+            method_names[2] = "edgeR"
+            method_names[3] = "Wilcoxon"
+            if (include_svc) method_names[4] = "SVC RFE-CV supported signature"
             for (i in expected_pairs) {
                 pair = expected_pairs[i]
                 if (pair_count[pair] != expected_per_pair) exit 14
-                for (j in expected_methods) {
-                    method = expected_methods[j]
+                for (j = 1; j <= expected_methods; j++) {
+                    method = method_names[j]
                     if (method_pair_count[method SUBSEP pair] != expected_per_method_pair) exit 15
                 }
             }
@@ -1099,6 +1171,148 @@ verify_svc_trace_keys() {
         [[ "$permute_matches" -eq 1 ]] ||
             fail "expected one completed task for $expected_tag, found $permute_matches"
     done
+
+    if [[ "$smoke_synth" == 1 ]]; then
+        for process_name in SVC_FULLSYNTH SVC_FULLSYNTH_POSTPROCESS; do
+            completed_matches="$(awk -F '\t' -v expected="$process_name" '
+                NR == 1 {
+                    for (i = 1; i <= NF; i++) {
+                        if ($i == "name") name_column = i
+                        if ($i == "status") status_column = i
+                    }
+                    if (!name_column || !status_column) exit 2
+                    next
+                }
+                index($(name_column), expected " (") && $(status_column) == "COMPLETED" {
+                    matches += 1
+                }
+                END { print matches + 0 }
+            ' "$log_dir/trace.tsv")" || fail "could not parse $process_name tasks from the trace"
+            [[ "$completed_matches" -eq $((smoke_nperms * 3 * 3)) ]] ||
+                fail "expected $((smoke_nperms * 3 * 3)) completed $process_name tasks, found $completed_matches"
+        done
+    fi
+}
+
+# Verify every gated full-synthetic table against its gate summary and combined row
+verify_svc_fullsynth_outputs() {
+    svc_output_dir="$output_dir/svctables"
+    expected_svc_datasets=$((smoke_nperms * 3 * 3))
+    observed_svc_datasets=0
+
+    while IFS= read -r gate_file; do
+        gate_prefix="${gate_file%_gate.csv}"
+        table_file="${gate_prefix}_table.csv"
+        curve_file="${gate_prefix}_curve.csv"
+        metadata_file="${gate_prefix}_metadata.json"
+        null_file="${gate_prefix}_gate_null.csv"
+        supported_file="${gate_prefix}_n_supported_features.txt"
+        require_file "$table_file"
+        require_file "$curve_file"
+        require_file "$metadata_file"
+        require_file "$null_file"
+        require_file "$supported_file"
+        require_png "${gate_prefix}_gate.png"
+
+        gate_status="$(single_row_csv_value "$gate_file" status)" ||
+            fail "could not read full-synthetic SVC gate status"
+        permutations_run="$(single_row_csv_value "$gate_file" permutations_run)" ||
+            fail "could not read full-synthetic SVC gate permutation count"
+        [[ "$permutations_run" =~ ^[1-9][0-9]*$ ]] ||
+            fail "invalid full-synthetic SVC gate permutation count: $permutations_run"
+        null_rows="$(awk 'END { print (NR > 0 ? NR - 1 : 0) }' "$null_file")"
+        [[ "$null_rows" -eq "$permutations_run" ]] ||
+            fail "full-synthetic SVC gate summary and null rows disagree"
+        curve_header="$(head -n 1 "$curve_file")"
+        for adaptive_column in search_stage coarse_winner refinement_lower refinement_upper; do
+            [[ ",$curve_header," == *",$adaptive_column,"* ]] ||
+                fail "full-synthetic SVC curve lacks $adaptive_column"
+        done
+        null_header="$(head -n 1 "$null_file")"
+        for adaptive_column in coarse_feature_counts refined_feature_counts \
+            evaluated_feature_counts mean_test_scores score_sums selected_stage
+        do
+            [[ ",$null_header," == *",$adaptive_column,"* ]] ||
+                fail "full-synthetic SVC gate null lacks $adaptive_column"
+        done
+        grep -Fq '"adaptive_search"' "$metadata_file" ||
+            fail "full-synthetic SVC metadata lacks its adaptive-search record"
+
+        feature_counts="$(awk -F',' '
+            function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    name = clean($i)
+                    if (name == "selected_feature") selected_column = i
+                    if (name == "supported_feature") supported_column = i
+                }
+                if (!selected_column || !supported_column) exit 2
+                next
+            }
+            {
+                selected = clean($(selected_column))
+                supported = clean($(supported_column))
+                if (selected !~ /^[01]$/ || supported !~ /^[01]$/ || supported > selected) exit 3
+                selected_count += selected
+                supported_count += supported
+            }
+            END { print selected_count + 0, supported_count + 0 }
+        ' "$table_file")" || fail "invalid full-synthetic SVC candidate/support columns"
+        read -r selected_count supported_count <<< "$feature_counts"
+        recorded_supported="$(tr -d '[:space:]' < "$supported_file")"
+        [[ "$recorded_supported" == "$supported_count" ]] ||
+            fail "full-synthetic SVC supported-feature counts disagree"
+
+        case "$gate_status" in
+            passed)
+                [[ "$supported_count" -eq "$selected_count" && "$supported_count" -gt 0 ]] ||
+                    fail "passing full-synthetic SVC gate did not support every candidate"
+                ;;
+            no_predictive_signal)
+                [[ "$supported_count" -eq 0 ]] ||
+                    fail "failed full-synthetic SVC gate retained supported features"
+                ;;
+            *) fail "unexpected full-synthetic SVC gate status: $gate_status" ;;
+        esac
+
+        filename="${gate_file##*/}"
+        if [[ ! "$filename" =~ ^svc_fullsynth_depth_([0-9]+)_ref_([0-9]+)_alt_([0-9]+)_replicate_([0-9]+)_gate.csv$ ]]; then
+            fail "unexpected full-synthetic SVC gate filename: $filename"
+        fi
+        depth="${BASH_REMATCH[1]}"
+        refnum="${BASH_REMATCH[2]}"
+        altnum="${BASH_REMATCH[3]}"
+        replicate="${BASH_REMATCH[4]}"
+        metric_values="$(awk -F',' \
+            -v wanted_depth="$depth" -v wanted_ref="$refnum" \
+            -v wanted_alt="$altnum" -v wanted_replicate="$replicate" '
+            function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+            NR == 1 {
+                for (i = 1; i <= NF; i++) column[clean($i)] = i
+                next
+            }
+            clean($(column["method"])) == "SVC RFE-CV supported signature" &&
+            clean($(column["depth"])) + 0 == wanted_depth + 0 &&
+            clean($(column["refnum"])) == wanted_ref &&
+            clean($(column["altnum"])) == wanted_alt &&
+            clean($(column["replicate"])) == wanted_replicate {
+                print clean($(column["metric_status"])), clean($(column["n_called"]))
+                matches += 1
+            }
+            END { if (matches != 1) exit 2 }
+        ' "$output_dir/synth_results.csv")" ||
+            fail "could not match a full-synthetic SVC gate to its combined result"
+        read -r metric_status n_called <<< "$metric_values"
+        expected_metric_status="ok"
+        [[ "$gate_status" == passed ]] || expected_metric_status="no_predictive_signal"
+        [[ "$metric_status" == "$expected_metric_status" && "$n_called" -eq "$supported_count" ]] ||
+            fail "full-synthetic SVC gate, table, and combined result disagree"
+
+        ((observed_svc_datasets += 1))
+    done < <(find -L "$svc_output_dir" -maxdepth 1 -type f -name 'svc_fullsynth_*_gate.csv' -print | sort)
+
+    [[ "$observed_svc_datasets" -eq "$expected_svc_datasets" ]] ||
+        fail "expected $expected_svc_datasets gated full-synthetic SVC datasets, found $observed_svc_datasets"
 }
 
 verify_svc_outputs() {
@@ -1122,6 +1336,10 @@ verify_svc_outputs() {
         model.pickle
         metadata.json
         n_selected_features.txt
+        n_supported_features.txt
+        gate.csv
+        gate_null.csv
+        gate.png
     )
     svc_prefixes=(svc_basic)
     for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
@@ -1199,12 +1417,12 @@ done
 require_file "$output_dir/deseq_poorfits.RData"
 require_file "$output_dir/quasi_results.csv"
 
-# KI-027: with fewer than five permutations this is currently RData carrying a
-# .pdf extension. Keep the default smoke run fast without blessing that format.
+# Require a real violin plot only when enough permutations are available
 if [[ "$smoke_nperms" -ge 5 ]]; then
     require_pdf "$output_dir/permute_violins.pdf"
 else
-    require_file "$output_dir/permute_violins.pdf"
+    [[ ! -e "$output_dir/permute_violins.pdf" ]] ||
+        fail "permute_violins.pdf should be omitted below five permutations"
 fi
 
 if [[ "$smoke_synth" == 1 ]]; then
@@ -1233,6 +1451,9 @@ verify_quasi_metrics
 if [[ "$smoke_svc" == 1 ]]; then
     verify_svc_trace_keys
     verify_svc_outputs
+    if [[ "$smoke_synth" == 1 ]]; then
+        verify_svc_fullsynth_outputs
+    fi
 fi
 if [[ "$smoke_synth" == 1 ]]; then
     verify_fullsynth_datasets

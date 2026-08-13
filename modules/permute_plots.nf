@@ -74,7 +74,7 @@ process PERMUTE_PLOTS{
       strsplit(split = ",") %>% unlist()
     SVC.perms = sapply(SVC.inlist, function(x) as.integer(read.delim(x, header = FALSE))) %>% unname()
     # Collated input
-    SVC.permute.input =  data.frame(method = "SVC-RFECV candidates",
+    SVC.permute.input =  data.frame(method = "SVC RFE-CV candidates",
                                     nSelected = SVC.nfeatures,
                                     permutes = SVC.perms)
 
