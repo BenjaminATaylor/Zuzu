@@ -200,7 +200,7 @@ Stability selection produces a selected set, not one uniquely defined final pred
 
 ### 7.1 Baseline analysis
 
-The baseline branch will run the complete procedure once on the cleaned observed data. Its stable signature may be included in inter-method overlap summaries, but it must be labelled `Stability-selected elastic-net features` rather than `DEGs`.
+The baseline branch will run the complete procedure once on the cleaned observed data. Its stable signature is included in the baseline UpSet comparison as `Elastic net stable features`, rather than being labelled as `DEGs`. The exploratory negative-binomial-fit violin diagnostic uses the same four-list membership counts.
 
 The initial integration should publish its own tables, diagnostics, metadata, and plot in a dedicated output directory. It is enabled only by `enetstep` and must remain separately selectable from SVC's `mlstep`.
 

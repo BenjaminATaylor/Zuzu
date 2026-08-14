@@ -160,6 +160,9 @@ workflow {
     params.mlstep
       ? SVC_BASIC.out.table
       : dummypath,
+    params.enetstep
+      ? ENET_BASIC.out.table
+      : dummypath,
   )
   // Summarise per-gene selection across null permutations
   PERMUTE_HISTS(

@@ -10,7 +10,8 @@ process INTER_OBSERVER_BASIC{
   path deseq_dds
   path edger_table
   path wilcox_table
-  path SVC_table
+  path SVC_table, stageAs: 'svc_basic.csv'
+  path enet_table, stageAs: 'enet_basic.csv'
 
   output:
   path "upSet_basic.pdf"
@@ -102,15 +103,22 @@ process INTER_OBSERVER_BASIC{
         hyprp = thisgot\$hypergeom
     }
 
-    # also generate an upSet showing the intersections
+    # Also generate an UpSet showing the baseline gene-list intersections
     listInput.combined <- list("DESeq2" = degs.deseq,
                             "edgeR" = degs.edger,
                             "Wilcoxon" = degs.wilcox)
 
-    print(upset.combined <- upset(fromList(listInput.combined), order.by = "degree", 
-                                point.size = 4, line.size = 2, 
-                                mainbar.y.label = "DEG intersections", 
-                                sets.x.label = "Number of DEGs", 
+    upset.lists = listInput.combined
+    if("$params.enetstep" == "true"){
+        enet.table = read.csv("$enet_table", row.names = 1, check.names = FALSE)
+        degs.enet = row.names(subset(enet.table, stable_feature))
+        upset.lists[["Elastic net"]] = degs.enet
+    }
+
+    print(upset.combined <- upset(fromList(upset.lists), order.by = "degree",
+                                point.size = 4, line.size = 2,
+                                mainbar.y.label = "Gene-list intersections",
+                                sets.x.label = "Selected features",
                                 empty.intersections = "on", text.scale = 3.2)
     )
 
@@ -134,29 +142,41 @@ process INTER_OBSERVER_BASIC{
     deseq.poorfits = mapply(getfit, deseq.normcounts, deseq.dispersions)
     save(deseq.poorfits,file = "deseq_poorfits.RData") # Save for downstream
 
-    # Okay, now what we want to do is divide genes into sets based on how many methods selected them as DEGs
-    # I.e., just one method, two methods, all three
-    # Get IDs used by UpSet
-    thesegenes = unlist(listInput.combined, use.names = FALSE)
+    # Divide genes into sets based on how many baseline gene lists selected them
+    # Get IDs used by the expanded UpSet
+    thesegenes = unlist(upset.lists, use.names = FALSE)
     thesegenes = thesegenes[!duplicated(thesegenes)]
-    # Get rowsums of UpSet intersections
-    intersects = data.frame(gene = thesegenes, sum = rowSums(upset.combined\$New_data))
+    # Count membership across the conventional and elastic-net lists
+    gene.list.membership = vapply(
+      upset.lists,
+      function(degs) thesegenes %in% degs,
+      logical(length(thesegenes))
+    )
+    intersects = data.frame(gene = thesegenes, sum = rowSums(gene.list.membership))
     ggframe = left_join(intersects, rownames_to_column(data.frame(deseq.poorfits),var = "gene")) %>%
     `colnames<-`(c("gene","sum","poorfit"))
 
+    # Compare the negative-binomial fit between every observed membership count
+    observed.counts = sort(unique(as.character(ggframe\$sum)))
+    poorfit.comparisons = if(length(observed.counts) > 1){
+      combn(observed.counts, 2, simplify = FALSE)
+    } else {
+      list()
+    }
+
     gg.poor = ggplot(ggframe, aes(x = as.factor(sum), y = poorfit)) +
     geom_violin() + 
-    labs(x = "Number of methods in which gene was identified as a DEG",
+    labs(x = "Number of baseline gene lists selecting each gene",
         y = "Poorness of fit to Negative Binomial distribution") +
-    stat_compare_means(method = "wilcox.test",
-                        label = "p.signif",
-                        size = 5,
-                        comparisons = list(c("1","2"),
-                                            c("2","3"),
-                                            c("1","3"))#,
-                        #label.y = c(0.31, 0.275, 0.255)
-                        ) +
     theme_bw()
+
+    if(length(poorfit.comparisons) > 0){
+      gg.poor = gg.poor +
+        stat_compare_means(method = "wilcox.test",
+                           label = "p.signif",
+                           size = 5,
+                           comparisons = poorfit.comparisons)
+    }
 
     ggsave(gg.poor, 
         filename = "basic_overlap_violins.pdf",
