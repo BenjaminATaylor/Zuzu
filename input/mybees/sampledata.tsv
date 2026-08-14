@@ -1,3 +1,4 @@
+sample_id	sample_name	tissue	colony	phenotype
 AS5120001	DFB-01_Rep01	brain	D	forager
 AS5120002	DFB-02_Rep02	brain	D	forager
 AS5120003	DFB-03_Rep03	brain	D	forager
