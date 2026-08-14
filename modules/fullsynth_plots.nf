@@ -1,6 +1,7 @@
 process FULLSYNTH_PLOTS {
 
-    publishDir "$params.outdir"
+    publishDir "$params.outdir", pattern: 'synth_plot.pdf'
+    publishDir "$params.outdir", pattern: 'synth_*.csv', mode: 'copy'
 
     input:
     path(deseq_synths,  stageAs: 'deseq/outframe_?.csv')

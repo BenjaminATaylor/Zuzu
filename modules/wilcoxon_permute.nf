@@ -6,7 +6,7 @@ process WILCOXON_PERMUTE{
   tuple val(x), path(samplesheet), path(countsframe)
 
   output:
-  path "wilcox_table.csv", emit: outfile
+  path "wilcox_permute_replicate_${x}_table.csv", emit: outfile
   path "nDEGs.RData", emit: nDEGs
 
   script:
@@ -42,6 +42,7 @@ process WILCOXON_PERMUTE{
 
   nDEGs = length(which(wilcox.padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  write.csv(wilcox.padj, row.names = TRUE, file = "wilcox_table.csv")
+  write.csv(wilcox.padj, row.names = TRUE,
+            file = "wilcox_permute_replicate_${x}_table.csv")
   """
 }

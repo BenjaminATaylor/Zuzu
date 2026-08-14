@@ -139,11 +139,11 @@ workflow {
   // Combine outputs and plot
   PERMUTE_PLOTS(
     DESEQ_BASIC.out.table,
-    DESEQ_PERMUTE.out.nDEGs.collect(),
+    DESEQ_PERMUTE.out.outfile.collect(),
     EDGER_BASIC.out,
-    EDGER_PERMUTE.out.nDEGs.collect(),
+    EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_BASIC.out,
-    WILCOXON_PERMUTE.out.nDEGs.collect(),
+    WILCOXON_PERMUTE.out.outfile.collect(),
     params.mlstep ? SVC_BASIC.out.table : dummypath,
     params.mlstep ? SVC_PERMUTE.out.nFeatures.collect() : dummypath,
     params.enetstep ? ENET_BASIC.out.summary : dummypath,

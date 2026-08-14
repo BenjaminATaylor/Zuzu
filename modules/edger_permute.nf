@@ -6,7 +6,7 @@ process EDGER_PERMUTE{
   tuple val(x), path(samplesheet), path(countsframe)
 
   output:
-  path "edger_table.csv", emit: outfile
+  path "edger_permute_replicate_${x}_table.csv", emit: outfile
   path "nDEGs.RData", emit: nDEGs
 
   script:
@@ -46,6 +46,6 @@ process EDGER_PERMUTE{
 
   nDEGs = nrow(subset(edge.out,padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  write.csv(edge.out, file="edger_table.csv", row.names = T)
+  write.csv(edge.out, file="edger_permute_replicate_${x}_table.csv", row.names = T)
   """
 }

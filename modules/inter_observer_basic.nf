@@ -2,7 +2,9 @@ process INTER_OBSERVER_BASIC{
 
   debug false
 
-  publishDir "$params.outdir"
+  publishDir "$params.outdir", pattern: '*.pdf'
+  publishDir "$params.outdir", pattern: '*.RData'
+  publishDir "$params.outdir", pattern: 'baseline_*.csv', mode: 'copy'
   label 'mid_job'
 
   input:
@@ -16,6 +18,8 @@ process INTER_OBSERVER_BASIC{
   output:
   path "upSet_basic.pdf"
   path "basic_overlap_violins.pdf"
+  path "baseline_membership.csv"
+  path "baseline_pairwise_overlap.csv"
   path "deseq_poorfits.RData", emit: deseq_poorfits
 
     script:
@@ -29,27 +33,19 @@ process INTER_OBSERVER_BASIC{
 
     deseq.full = get(load("$deseq_dds"))
 
-    #hypergeometric overlap test function
-    gene_overlap_test = function(list1, list2, background,verbose=TRUE,lower.tail=FALSE){
-        n_A = length(list1)
-        n_B = length(list2)
-        n_C = length(background)
-        n_A_B = length(intersect(list1,list2))
-        hyp = phyper(n_A_B - 1, n_A, n_C-n_A, n_B, lower.tail = lower.tail)
-        expc = round((n_A/n_C)*n_B)
-        jac = n_A_B/(n_A+n_B-n_A_B)
-        if(verbose){print(paste0(n_A_B," matching from lists of lengths ",n_A," and ",
-                                n_B,"; p=",round(hyp,4),". Expected intersection length = ",expc))}
-        res = list(hypergeom = round(hyp,4),
-                    jaccard = jac,
-                    intersect = n_A_B)
-        return(res)
-    }
     ## DESeq inputs
     # DEGs from full model
-    deseq.table = read.csv("$deseq_table", row.names = 1)
-    edger.table = read.csv("$edger_table", row.names = 1)
-    wilcox.table = read.csv("$wilcox_table", row.names = 1)
+    deseq.table = read.csv("$deseq_table", row.names = 1, check.names = FALSE)
+    edger.table = read.csv("$edger_table", row.names = 1, check.names = FALSE)
+    wilcox.table = read.csv("$wilcox_table", row.names = 1, check.names = FALSE)
+    analysis.genes = row.names(deseq.table)
+    if(!setequal(analysis.genes, row.names(edger.table)) ||
+       !setequal(analysis.genes, row.names(wilcox.table))){
+        stop("Conventional baseline tables do not share the same gene universe")
+    }
+    edger.table = edger.table[analysis.genes,,drop = FALSE]
+    wilcox.table = wilcox.table[analysis.genes,,drop = FALSE]
+
     getdegs = function(df, ml=FALSE){ 
     if(ml){
             return(row.names(subset(df, selected_feature == 1)))
@@ -67,42 +63,6 @@ process INTER_OBSERVER_BASIC{
         degs.svc = getdegs(svc.table, ml=TRUE)
     }
 
-    # Combine adjusted p-values across the shared gene order
-    compframe = cbind(select(deseq.table,padj), 
-                    select(edger.table,padj),
-                    select(wilcox.table,padj))  %>% 
-    remove_rownames() %>%
-    `colnames<-`(c("deseq","edger","wilcox"))
-
-    pairs = t(combn(colnames(compframe),2))
-            
-    for(i in 1:nrow(pairs)){
-  
-        a = compframe[,pairs[i,1]]
-        b = compframe[,pairs[i,2]]
-        
-        # First let's test the correlations of the p-values of the two sets (only relevant where we have pvals)
-        # RRHO would be nice here but neither of the two existing packages (RRHO and RedRibbon) are suitable- the former due to bugs and the latter due to instability
-        # TODO: apply my own RRHO algorithm
-        cor.kendall = cor.test(a, b, 
-                                alternative = "two.sided",
-                                method = "kendall")\$estimate
-        cor.pearson = cor.test(a, b, 
-                                alternative = "two.sided",
-                                method = "pearson")\$estimate
-        plot(a,b)
-        
-        # As expected, the pval correlations themselves are usually very high. The more interesting question is how similar each pair of methods is in terms of the specific set of DEGs identified
-        
-        alldegs = row.names(compframe)
-        a = get(paste0("degs.",pairs[i,1]))
-        b = get(paste0("degs.",pairs[i,2]))
-        
-        thisgot = gene_overlap_test(a, b, alldegs, verbose = FALSE)
-        jacc = thisgot\$jaccard
-        hyprp = thisgot\$hypergeom
-    }
-
     # Also generate an UpSet showing the baseline gene-list intersections
     listInput.combined <- list("DESeq2" = degs.deseq,
                             "edgeR" = degs.edger,
@@ -111,9 +71,90 @@ process INTER_OBSERVER_BASIC{
     upset.lists = listInput.combined
     if("$params.enetstep" == "true"){
         enet.table = read.csv("$enet_table", row.names = 1, check.names = FALSE)
+        if(!setequal(analysis.genes, row.names(enet.table))){
+            stop("Elastic-net and conventional baselines do not share the same gene universe")
+        }
+        enet.table = enet.table[analysis.genes,,drop = FALSE]
         degs.enet = row.names(subset(enet.table, stable_feature))
         upset.lists[["Elastic net"]] = degs.enet
     }
+
+    # Keep adjusted p-value correlations for pairs where both methods report them
+    # RRHO would be nice here but neither existing package was sufficiently stable
+    # TODO: apply my own RRHO algorithm
+    conventional.padj = list(
+      "DESeq2" = deseq.table\$padj,
+      "edgeR" = edger.table\$padj,
+      "Wilcoxon" = wilcox.table\$padj
+    )
+    get.padj.correlation = function(method.pair, correlation.method){
+      if(!all(method.pair %in% names(conventional.padj))){
+        return(NA_real_)
+      }
+      a = conventional.padj[[method.pair[1]]]
+      b = conventional.padj[[method.pair[2]]]
+      complete = complete.cases(a, b)
+      if(sum(complete) < 2L || sd(a[complete]) == 0 || sd(b[complete]) == 0){
+        return(NA_real_)
+      }
+      cor(a[complete], b[complete], method = correlation.method)
+    }
+
+    # Retain every gene's membership in each enabled baseline list
+    membership.matrix = vapply(
+      upset.lists,
+      function(degs) analysis.genes %in% degs,
+      logical(length(analysis.genes))
+    )
+    baseline.membership = data.frame(
+      gene = analysis.genes,
+      membership.matrix,
+      check.names = FALSE
+    )
+    if(!"Elastic net" %in% names(baseline.membership)){
+      baseline.membership[["Elastic net"]] = NA
+    }
+    baseline.membership[["n_methods_run"]] = length(upset.lists)
+    baseline.membership[["n_methods_selected"]] = rowSums(membership.matrix)
+    write.csv(baseline.membership, "baseline_membership.csv", row.names = FALSE)
+
+    # Retain pairwise gene-list agreement over the shared tested universe
+    method.pairs = combn(names(upset.lists), 2, simplify = FALSE)
+    baseline.pairwise.overlap = lapply(method.pairs, function(method.pair){
+      list.1 = unique(upset.lists[[method.pair[1]]])
+      list.2 = unique(upset.lists[[method.pair[2]]])
+      intersection.size = length(intersect(list.1, list.2))
+      union.size = length(union(list.1, list.2))
+      data.frame(
+        method_1 = method.pair[1],
+        method_2 = method.pair[2],
+        n_tested = length(analysis.genes),
+        n_selected_1 = length(list.1),
+        n_selected_2 = length(list.2),
+        selection_proportion_1 = length(list.1) / length(analysis.genes),
+        selection_proportion_2 = length(list.2) / length(analysis.genes),
+        intersection = intersection.size,
+        union = union.size,
+        jaccard = if(union.size == 0L) NA_real_ else intersection.size / union.size,
+        expected_intersection = length(list.1) * length(list.2) / length(analysis.genes),
+        hypergeometric_p_value = phyper(
+          intersection.size - 1,
+          length(list.1),
+          length(analysis.genes) - length(list.1),
+          length(list.2),
+          lower.tail = FALSE
+        ),
+        padj_kendall_correlation = get.padj.correlation(method.pair, "kendall"),
+        padj_pearson_correlation = get.padj.correlation(method.pair, "pearson"),
+        overlap_status = if(union.size == 0L) "both_lists_empty" else "ok",
+        stringsAsFactors = FALSE
+      )
+    }) %>% bind_rows()
+    write.csv(
+      baseline.pairwise.overlap,
+      "baseline_pairwise_overlap.csv",
+      row.names = FALSE
+    )
 
     print(upset.combined <- upset(fromList(upset.lists), order.by = "degree",
                                 point.size = 4, line.size = 2,

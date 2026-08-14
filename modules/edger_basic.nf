@@ -1,5 +1,7 @@
 process EDGER_BASIC{
 
+  publishDir "$params.outdir/tables", pattern: 'edger_table.csv', mode: 'copy'
+
   input: 
   tuple path(samplesheet), path(countsframe) 
 

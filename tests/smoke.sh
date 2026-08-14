@@ -326,6 +326,224 @@ single_row_csv_value() {
     ' "$csv_file"
 }
 
+verify_durable_tables() {
+    for durable_table in \
+        qc_sample_metrics.csv \
+        qc_pairwise_distances.csv \
+        permute_results.csv \
+        baseline_membership.csv \
+        baseline_pairwise_overlap.csv \
+        tables/deseq_table.csv \
+        tables/edger_table.csv \
+        tables/wilcox_table.csv
+    do
+        require_file "$output_dir/$durable_table"
+        [[ ! -L "$output_dir/$durable_table" ]] ||
+            fail "durable table was published as a symlink: $durable_table"
+    done
+
+    # Check that sample metrics and unique VST distances cover the full fixture
+    awk -F',' -v expected_ref="$smoke_reflevel" -v expected_alt="$smoke_altlevel" '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("sample phenotype PC1 PC2 filtered_library_size detected_gene_count PC1_variance_percent PC2_variance_percent", required, " ")
+            for (i in required) if (!(required[i] in column)) exit 2
+            next
+        }
+        {
+            sample = clean($(column["sample"]))
+            phenotype = clean($(column["phenotype"]))
+            if (sample == "" || seen[sample]++) exit 3
+            if (phenotype != expected_ref && phenotype != expected_alt) exit 4
+            if (!is_number(clean($(column["PC1"]))) ||
+                !is_number(clean($(column["PC2"]))) ||
+                !is_number(clean($(column["filtered_library_size"]))) ||
+                !is_number(clean($(column["detected_gene_count"]))) ||
+                !is_number(clean($(column["PC1_variance_percent"]))) ||
+                !is_number(clean($(column["PC2_variance_percent"])))) exit 5
+            if (clean($(column["filtered_library_size"])) <= 0 ||
+                clean($(column["detected_gene_count"])) <= 0) exit 6
+            phenotype_count[phenotype] += 1
+            rows += 1
+        }
+        END {
+            if (rows != 54 || phenotype_count[expected_ref] != 30 ||
+                phenotype_count[expected_alt] != 24) exit 7
+        }
+    ' "$output_dir/qc_sample_metrics.csv" || fail "invalid durable QC sample metrics"
+
+    awk -F',' '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("sample_1 phenotype_1 sample_2 phenotype_2 comparison vst_distance", required, " ")
+            for (i in required) if (!(required[i] in column)) exit 2
+            next
+        }
+        {
+            sample_1 = clean($(column["sample_1"]))
+            sample_2 = clean($(column["sample_2"]))
+            comparison = clean($(column["comparison"]))
+            distance = clean($(column["vst_distance"]))
+            if (sample_1 == "" || sample_2 == "" || sample_1 == sample_2 ||
+                seen[sample_1 SUBSEP sample_2]++) exit 3
+            if (comparison != "within phenotype" && comparison != "between phenotypes") exit 4
+            if (!is_number(distance) || distance < 0) exit 5
+            comparison_count[comparison] += 1
+            rows += 1
+        }
+        END {
+            if (rows != 1431 || comparison_count["within phenotype"] != 711 ||
+                comparison_count["between phenotypes"] != 720) exit 6
+        }
+    ' "$output_dir/qc_pairwise_distances.csv" || fail "invalid durable QC pairwise distances"
+
+    # Check the keyed observed/permuted selection table and its proportions
+    expected_methods=$((3 + smoke_svc + smoke_enet))
+    awk -F',' \
+        -v expected_methods="$expected_methods" \
+        -v expected_permutations="$smoke_nperms" \
+        -v include_svc="$smoke_svc" \
+        -v include_enet="$smoke_enet" '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        function absolute(value) { return value < 0 ? -value : value }
+        function is_integer(value) { return value ~ /^[0-9]+$/ }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("method label_assignment replicate n_tested n_selected selection_proportion", required, " ")
+            for (i in required) if (!(required[i] in column)) exit 2
+            next
+        }
+        {
+            method = clean($(column["method"]))
+            assignment = clean($(column["label_assignment"]))
+            replicate = clean($(column["replicate"]))
+            n_tested = clean($(column["n_tested"]))
+            n_selected = clean($(column["n_selected"]))
+            proportion = clean($(column["selection_proportion"]))
+            valid_method = method == "DESeq2" || method == "edgeR" || method == "Wilcoxon" ||
+                (include_svc && method == "SVC RFE-CV candidates") ||
+                (include_enet && method == "Stability-selected elastic net")
+            if (!valid_method || !is_integer(n_tested) || !is_integer(n_selected) ||
+                !is_number(proportion) || n_tested < 1 || n_selected > n_tested ||
+                absolute(proportion - n_selected / n_tested) > 1e-12) exit 3
+            if (!universe) universe = n_tested
+            if (n_tested != universe) exit 4
+            methods[method] = 1
+            if (assignment == "observed") {
+                if (replicate != "NA" || observed[method]++) exit 5
+            } else if (assignment == "permuted") {
+                if (!is_integer(replicate) || replicate < 1 || replicate > expected_permutations ||
+                    permuted[method SUBSEP replicate]++) exit 6
+                permutation_count[method] += 1
+            } else exit 7
+            rows += 1
+        }
+        END {
+            for (method in methods) {
+                method_count += 1
+                if (observed[method] != 1 || permutation_count[method] != expected_permutations) exit 8
+            }
+            if (method_count != expected_methods ||
+                rows != expected_methods * (expected_permutations + 1)) exit 9
+        }
+    ' "$output_dir/permute_results.csv" || fail "invalid durable permutation results"
+
+    membership_rows="$(awk 'END { print NR - 1 }' "$output_dir/baseline_membership.csv")"
+    [[ "$membership_rows" -gt 0 ]] || fail "baseline membership table has no genes"
+    for baseline_table in deseq_table.csv edger_table.csv wilcox_table.csv; do
+        baseline_rows="$(awk 'END { print NR - 1 }' "$output_dir/tables/$baseline_table")"
+        [[ "$baseline_rows" -eq "$membership_rows" ]] ||
+            fail "$baseline_table does not match the baseline membership universe"
+    done
+
+    awk -F',' -v include_enet="$smoke_enet" '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("gene DESeq2 edgeR Wilcoxon n_methods_run n_methods_selected", required, " ")
+            if (!("Elastic net" in column)) exit 2
+            for (i in required) if (!(required[i] in column)) exit 3
+            next
+        }
+        {
+            gene = clean($(column["gene"]))
+            if (gene == "" || seen[gene]++) exit 4
+            selected = 0
+            split("DESeq2 edgeR Wilcoxon", methods, " ")
+            for (i in methods) {
+                value = clean($(column[methods[i]]))
+                if (value != "TRUE" && value != "FALSE") exit 5
+                selected += value == "TRUE"
+            }
+            enet = clean($(column["Elastic net"]))
+            if (include_enet) {
+                if (enet != "TRUE" && enet != "FALSE") exit 6
+                selected += enet == "TRUE"
+            } else if (enet != "NA") exit 7
+            if (clean($(column["n_methods_run"])) != 3 + include_enet ||
+                clean($(column["n_methods_selected"])) != selected) exit 8
+            rows += 1
+        }
+        END { if (rows == 0) exit 9 }
+    ' "$output_dir/baseline_membership.csv" || fail "invalid durable baseline membership table"
+
+    overlap_method_count=$((3 + smoke_enet))
+    expected_pairs=$((overlap_method_count * (overlap_method_count - 1) / 2))
+    awk -F',' -v expected_pairs="$expected_pairs" -v expected_tested="$membership_rows" '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        function absolute(value) { return value < 0 ? -value : value }
+        function is_integer(value) { return value ~ /^[0-9]+$/ }
+        function is_number(value) {
+            return value ~ /^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/
+        }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("method_1 method_2 n_tested n_selected_1 n_selected_2 selection_proportion_1 selection_proportion_2 intersection union jaccard expected_intersection hypergeometric_p_value overlap_status", required, " ")
+            for (i in required) if (!(required[i] in column)) exit 2
+            next
+        }
+        {
+            method_1 = clean($(column["method_1"]))
+            method_2 = clean($(column["method_2"]))
+            n_tested = clean($(column["n_tested"]))
+            n_1 = clean($(column["n_selected_1"]))
+            n_2 = clean($(column["n_selected_2"]))
+            intersection = clean($(column["intersection"]))
+            union_size = clean($(column["union"]))
+            jaccard = clean($(column["jaccard"]))
+            status = clean($(column["overlap_status"]))
+            if (method_1 == "" || method_2 == "" || method_1 == method_2 ||
+                seen[method_1 SUBSEP method_2]++) exit 3
+            if (!is_integer(n_tested) || !is_integer(n_1) || !is_integer(n_2) ||
+                !is_integer(intersection) || !is_integer(union_size) ||
+                n_tested != expected_tested || union_size != n_1 + n_2 - intersection) exit 4
+            if (absolute(clean($(column["selection_proportion_1"])) - n_1 / n_tested) > 1e-12 ||
+                absolute(clean($(column["selection_proportion_2"])) - n_2 / n_tested) > 1e-12 ||
+                absolute(clean($(column["expected_intersection"])) - n_1 * n_2 / n_tested) > 1e-12) exit 5
+            p_value = clean($(column["hypergeometric_p_value"]))
+            if (!is_number(p_value) || p_value < 0 || p_value > 1) exit 6
+            if (union_size == 0) {
+                if (jaccard != "NA" || status != "both_lists_empty") exit 7
+            } else if (!is_number(jaccard) ||
+                       absolute(jaccard - intersection / union_size) > 1e-12 || status != "ok") exit 8
+            rows += 1
+        }
+        END { if (rows != expected_pairs) exit 9 }
+    ' "$output_dir/baseline_pairwise_overlap.csv" ||
+        fail "invalid durable baseline pairwise overlap table"
+}
+
 locate_clean_outputs() {
     clean_counts=""
     clean_counts_matches=0
@@ -1636,6 +1854,10 @@ if [[ "$smoke_synth" == 1 ]]; then
     require_pdf "$output_dir/synth_plot.pdf"
     require_file "$output_dir/synth_results.csv"
     require_file "$output_dir/synth_summary.csv"
+    for synthetic_table in synth_results.csv synth_summary.csv; do
+        [[ ! -L "$output_dir/$synthetic_table" ]] ||
+            fail "durable synthetic table was published as a symlink: $synthetic_table"
+    done
 else
     for disabled_synth_output in synth_plot.pdf synth_results.csv synth_summary.csv; do
         [[ ! -e "$output_dir/$disabled_synth_output" ]] ||
@@ -1653,6 +1875,7 @@ verify_filter_warning
 locate_clean_outputs
 verify_common_filter
 verify_reference_direction
+verify_durable_tables
 verify_null_permutations
 verify_permutation_trace_keys
 verify_quasi_trace_keys
@@ -1699,6 +1922,19 @@ else
 fi
 
 cp -L "$output_dir/quasi_results.csv" "$plot_dir/quasi_results.csv"
+for durable_table in \
+    qc_sample_metrics.csv \
+    qc_pairwise_distances.csv \
+    permute_results.csv \
+    baseline_membership.csv \
+    baseline_pairwise_overlap.csv
+do
+    cp -L "$output_dir/$durable_table" "$plot_dir/$durable_table"
+done
+mkdir -p "$plot_dir/tables"
+for baseline_table in deseq_table.csv edger_table.csv wilcox_table.csv; do
+    cp -L "$output_dir/tables/$baseline_table" "$plot_dir/tables/$baseline_table"
+done
 
 if [[ "$smoke_nperms" -ge 5 ]]; then
     cp -L "$output_dir/permute_violins.pdf" "$plot_dir/permute_violins.pdf"

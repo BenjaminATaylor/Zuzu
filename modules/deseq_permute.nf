@@ -7,7 +7,7 @@ process DESEQ_PERMUTE{
   tuple val(x), path(samplesheet), path(countsframe)
 
   output:
-  path "deseq_table.csv", emit: outfile
+  path "deseq_permute_replicate_${x}_table.csv", emit: outfile
   path "nDEGs.RData", emit: nDEGs
 
   script:
@@ -37,6 +37,7 @@ process DESEQ_PERMUTE{
                           contrast = c("phenotype", altlevel, reflevel))
   nDEGs = nrow(subset(deseq.results,padj<0.05))
   save(nDEGs,file = "nDEGs.RData")
-  write.csv(data.frame(deseq.results),row.names=TRUE, file = "deseq_table.csv")
+  write.csv(data.frame(deseq.results), row.names = TRUE,
+            file = "deseq_permute_replicate_${x}_table.csv")
   """
 }

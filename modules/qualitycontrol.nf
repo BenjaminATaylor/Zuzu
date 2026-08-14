@@ -1,12 +1,15 @@
 process QUALITYCONTROL {
 
-  publishDir "$params.outdir"
+  publishDir "$params.outdir", pattern: 'QC_plots.pdf'
+  publishDir "$params.outdir", pattern: 'qc_*.csv', mode: 'copy'
 
   input: 
   tuple path(samplesheet), path(countsframe)
 
   output:
   path "QC_plots.pdf"
+  path "qc_sample_metrics.csv"
+  path "qc_pairwise_distances.csv"
 
   script:
   """
@@ -59,6 +62,38 @@ process QUALITYCONTROL {
     rownames_to_column(var = "sample") %>%
     left_join(samplesheet,
               by = "sample")
+
+  # Retain sample-level QC measurements for comparisons between runs
+  qc.sample.metrics = ggpcadata[,c(
+      "sample", "PC1", "PC2", setdiff(names(samplesheet), "sample")
+    ),drop = FALSE] %>%
+    mutate(
+      filtered_library_size = colSums(countsframe.clean)[match(sample, colnames(countsframe.clean))],
+      detected_gene_count = colSums(countsframe.clean > 0)[match(sample, colnames(countsframe.clean))],
+      PC1_variance_percent = 100 * pca.out\$percent.var[1],
+      PC2_variance_percent = 100 * pca.out\$percent.var[2]
+    )
+  write.csv(qc.sample.metrics, "qc_sample_metrics.csv", row.names = FALSE)
+
+  # Retain every unique pairwise VST distance and its phenotype relationship
+  pair.indices = which(upper.tri(sampleDistMatrix), arr.ind = TRUE)
+  sample.phenotypes = setNames(as.character(samplesheet\$phenotype), samplesheet\$sample)
+  qc.pairwise.distances = data.frame(
+    sample_1 = row.names(sampleDistMatrix)[pair.indices[,1]],
+    phenotype_1 = unname(sample.phenotypes[row.names(sampleDistMatrix)[pair.indices[,1]]]),
+    sample_2 = colnames(sampleDistMatrix)[pair.indices[,2]],
+    phenotype_2 = unname(sample.phenotypes[colnames(sampleDistMatrix)[pair.indices[,2]]]),
+    comparison = ifelse(
+      sample.phenotypes[row.names(sampleDistMatrix)[pair.indices[,1]]] ==
+        sample.phenotypes[colnames(sampleDistMatrix)[pair.indices[,2]]],
+      "within phenotype",
+      "between phenotypes"
+    ),
+    vst_distance = sampleDistMatrix[pair.indices],
+    stringsAsFactors = FALSE
+  )
+  write.csv(qc.pairwise.distances, "qc_pairwise_distances.csv", row.names = FALSE)
+
   #plot
   print(gg.pca <- ggplot(ggpcadata, aes(x = PC1, y = PC2, color = phenotype, label = sample)) +
           geom_point(size = 5) +

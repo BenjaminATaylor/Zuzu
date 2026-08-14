@@ -1,5 +1,7 @@
 process WILCOXON_BASIC{
 
+  publishDir "$params.outdir/tables", pattern: 'wilcox_table.csv', mode: 'copy'
+
   input: 
   tuple path(samplesheet), path(countsframe) 
 

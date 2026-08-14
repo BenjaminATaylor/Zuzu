@@ -2,6 +2,8 @@ process DESEQ_BASIC{
   
   label 'mid_job'
 
+  publishDir "$params.outdir/tables", pattern: 'deseq_table.csv', mode: 'copy'
+
   input: 
   tuple path(samplesheet), path(countsframe) 
 

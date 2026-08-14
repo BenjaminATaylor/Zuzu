@@ -93,7 +93,7 @@ Impact: rebuilding or rerunning later can change behaviour and numerical results
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, and plotting. `SMOKE_SYNTH=1` additionally exercises full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including the adaptive coarse/refined search, model-level signal gate, estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. Combining both flags also checks the nine gated full-synthetic SVC paths and their shared summaries. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, plotting, and the durable QC, baseline, overlap, and permutation tables. `SMOKE_SYNTH=1` additionally exercises full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including the adaptive coarse/refined search, model-level signal gate, estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. Combining both flags also checks the nine gated full-synthetic SVC paths and their shared summaries. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
 Impact: major workflow breakage and metric inconsistencies are easier to detect, but dependency-driven numerical changes and failures outside the covered invariants can still go unnoticed.
 
@@ -103,23 +103,11 @@ The workflow does not enable a standard trace, report, timeline, or manifest tha
 
 Impact: runs are difficult to audit or reproduce after the work directory and console history are gone.
 
-### KI-024: Conventional basic result tables are not published
-
-Baseline DESeq2, edgeR, and Wilcoxon tables are consumed internally but have no `publishDir` or top-level workflow output. They remain only in Nextflow's work cache even though the README presents baseline DEG calling as a standalone use case. Stage 1 now publishes the SVC candidate table and its supporting artifacts under `outdir/svctables`.
-
-Impact: primary inferential outputs are not durable user-facing deliverables.
-
 ### KI-025: Published outputs depend on the work cache
 
-With the current default `publishDir` mode, outputs are symlinks into `work/`.
+With the current default `publishDir` mode, most plots and non-tabular outputs are symlinks into `work/`. The conventional baseline tables and the QC, membership, pairwise-overlap, combined permutation, and aggregated synthetic tables are explicit copied exceptions.
 
 Impact: moving the repository or cleaning the work directory breaks published results, and retaining results requires retaining the much larger task cache.
-
-### KI-026: Collected permutation paths are handled as rendered strings
-
-[`PERMUTE_PLOTS`](modules/permute_plots.nf) accepts collected file paths as `val` inputs and parses their string representation rather than staging a path collection.
-
-Impact: the implementation relies on the whole work root being visible to tasks and is fragile on scratch/remote executors or paths containing spaces and commas.
 
 ### KI-028: Dummy ML inputs use a nonexistent sentinel path
 
@@ -248,3 +236,15 @@ The selected point is marked explicitly and is the smallest evaluated feature se
 ### KI-035: The quasi plot had an incorrect y-axis label
 
 Resolved 2026-08-10 alongside KI-003. [`QUASI_PLOTS`](modules/quasi_plots.nf) now labels the y-axis as a self-consistency metric and identifies each facet using both the reference- and alternative-group sample counts.
+
+### KI-024: Conventional basic result tables were not published
+
+Resolved 2026-08-14. The complete baseline DESeq2, edgeR, and Wilcoxon tables are now copied to `outdir/tables`. QC sample metrics and pairwise VST distances, per-gene baseline-list membership, pairwise list overlaps and Jaccard indices, and keyed observed/permuted selection counts and proportions are also published as copied CSV files. These tabular outputs do not depend on retaining the Nextflow work cache.
+
+The smoke test checks that the files are copies rather than symlinks, that their gene and sample universes agree, and that their membership, overlap, permutation-key, count, and proportion identities are internally consistent. KI-025 remains active for outputs that still use the default symlink publication mode.
+
+### KI-026: Collected permutation paths were handled as rendered strings
+
+Resolved 2026-08-14. Conventional permutation tables now have replicate-specific filenames, and [`PERMUTE_PLOTS`](modules/permute_plots.nf) stages conventional, SVC, and elastic-net path collections through declared `path` inputs. It extracts and validates the replicate key from each staged artifact rather than parsing a rendered Groovy list of work paths.
+
+The combined `permute_results.csv` retains one observed row and one row per method/permutation key, together with the tested universe, selected count, and selection proportion. The smoke test verifies uniqueness and completeness of these keys for every enabled method.
