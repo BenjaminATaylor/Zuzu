@@ -37,6 +37,8 @@ include { ENET_FULLSYNTH            } from './modules/enet_fullsynth.nf'
 include { SVC_FULLSYNTH             } from './modules/svc_fullsynth.nf'
 include { SVC_FULLSYNTH_POSTPROCESS } from './modules/svc_fullsynth_postprocess.nf'
 include { FULLSYNTH_PLOTS           } from './modules/fullsynth_plots.nf'
+include { RESAMPLE_ANALYSIS         } from './modules/resample_analysis.nf'
+include { RESAMPLE_SUMMARISE        } from './modules/resample_summarise.nf'
 
 //exit 1, 'DEBUG'
 
@@ -164,6 +166,86 @@ workflow {
       ? ENET_BASIC.out.table
       : dummypath,
   )
+
+  // Optionally assess end-to-end robustness to fewer biological replicates
+  // or lower count depth without crossing the two perturbation grids.
+  resampling_configurations = []
+  if (params.sample_subsampling || params.depth_subsampling) {
+    repeats_text = params.subsample_repeats.toString()
+    if (!(repeats_text ==~ /[1-9][0-9]*/)) {
+      exit(1, 'subsample_repeats must be a positive integer')
+    }
+    subsample_repeats_count = repeats_text.toInteger()
+
+    seed_text = params.subsample_seed.toString()
+    if (!(seed_text ==~ /[0-9]+/) || seed_text.toBigInteger() > 2147483646) {
+      exit(1, 'subsample_seed must be an integer between 0 and 2147483646')
+    }
+    subsample_seed_value = seed_text.toLong()
+
+    if (params.sample_subsampling) {
+      sample_target_tokens = params.subsample_sizes.toString()
+        .split(',')*.trim().findAll { token -> token }
+      if (!sample_target_tokens ||
+          sample_target_tokens.any { token -> !(token ==~ /[1-9][0-9]*/) }) {
+        exit(1, 'subsample_sizes must be a comma-separated list of positive integers')
+      }
+      if (sample_target_tokens.any { token -> token.toBigInteger() > 2147483646 }) {
+        exit(1, 'subsample_sizes contains a value above 2147483646')
+      }
+      sample_targets = sample_target_tokens
+        .collect { token -> token.toInteger() }.unique().sort()
+      sample_targets.each { target ->
+        (1..subsample_repeats_count).each { replicate ->
+          def generation_seed = ((subsample_seed_value + target.toLong() * 1009L +
+            replicate.toLong() * 9176L) % 2147483646L).toInteger() + 1
+          resampling_configurations.add(tuple(
+            'sample', replicate, target, generation_seed
+          ))
+        }
+      }
+    }
+
+    if (params.depth_subsampling) {
+      depth_target_tokens = params.subsample_depths.toString()
+        .split(',')*.trim().findAll { token -> token }
+      if (!depth_target_tokens ||
+          depth_target_tokens.any { token -> !(token ==~ /[1-9][0-9]*/) }) {
+        exit(1, 'subsample_depths must be a comma-separated list of positive integers')
+      }
+      if (depth_target_tokens.any { token -> token.toBigInteger() > 2147483646 }) {
+        exit(1, 'subsample_depths contains a value above 2147483646')
+      }
+      depth_targets = depth_target_tokens
+        .collect { token -> token.toInteger() }.unique().sort()
+      depth_targets.each { target ->
+        (1..subsample_repeats_count).each { replicate ->
+          def generation_seed = ((subsample_seed_value + 1000003L +
+            target.toLong() * 1009L + replicate.toLong() * 9176L) %
+            2147483646L).toInteger() + 1
+          resampling_configurations.add(tuple(
+            'depth', replicate, target, generation_seed
+          ))
+        }
+      }
+    }
+
+    resampling_tasks = channel.fromList(resampling_configurations)
+    RESAMPLE_ANALYSIS(
+      resampling_tasks,
+      ch_samplesheet,
+      ch_countsframe,
+      ch_reflevel,
+    )
+    RESAMPLE_SUMMARISE(
+      RESAMPLE_ANALYSIS.out.summaries.collect(),
+      RESAMPLE_ANALYSIS.out.genes.collect(),
+      RESAMPLE_ANALYSIS.out.allocations.collect(),
+      RESAMPLE_ANALYSIS.out.libraries.collect(),
+      INTER_OBSERVER_BASIC.out.membership,
+    )
+  }
+
   // Summarise per-gene selection across null permutations
   PERMUTE_HISTS(
     DESEQ_PERMUTE.out.outfile.collect(),

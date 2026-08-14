@@ -18,7 +18,7 @@ process INTER_OBSERVER_BASIC{
   output:
   path "upSet_basic.pdf"
   path "basic_overlap_violins.pdf"
-  path "baseline_membership.csv"
+  path "baseline_membership.csv", emit: membership
   path "baseline_pairwise_overlap.csv"
   path "deseq_poorfits.RData", emit: deseq_poorfits
 

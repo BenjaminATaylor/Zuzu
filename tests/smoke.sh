@@ -11,6 +11,8 @@ smoke_nperms="${SMOKE_NPERMS:-1}"
 smoke_synth="${SMOKE_SYNTH:-0}"
 smoke_svc="${SMOKE_SVC:-0}"
 smoke_enet="${SMOKE_ENET:-0}"
+smoke_sample_subsampling="${SMOKE_SAMPLE_SUBSAMPLING:-0}"
+smoke_depth_subsampling="${SMOKE_DEPTH_SUBSAMPLING:-0}"
 smoke_docker="${SMOKE_DOCKER:-1}"
 smoke_container="${SMOKE_CONTAINER:-}"
 smoke_max_permute_correlation="0.6"
@@ -28,6 +30,10 @@ fail() {
 [[ "$smoke_synth" =~ ^[01]$ ]] || fail "SMOKE_SYNTH must be either 0 or 1"
 [[ "$smoke_svc" =~ ^[01]$ ]] || fail "SMOKE_SVC must be either 0 or 1"
 [[ "$smoke_enet" =~ ^[01]$ ]] || fail "SMOKE_ENET must be either 0 or 1"
+[[ "$smoke_sample_subsampling" =~ ^[01]$ ]] ||
+    fail "SMOKE_SAMPLE_SUBSAMPLING must be either 0 or 1"
+[[ "$smoke_depth_subsampling" =~ ^[01]$ ]] ||
+    fail "SMOKE_DEPTH_SUBSAMPLING must be either 0 or 1"
 [[ "$smoke_docker" =~ ^[01]$ ]] || fail "SMOKE_DOCKER must be either 0 or 1"
 fullsynth_method_count=3
 if [[ "$smoke_svc" == 1 ]]; then
@@ -215,6 +221,16 @@ if [[ "$smoke_enet" == 1 ]]; then
     )
 fi
 
+# Keep each optional robustness branch to one deliberately small dataset.
+subsample_args=(
+    --sample_subsampling "$smoke_sample_subsampling"
+    --depth_subsampling "$smoke_depth_subsampling"
+    --subsample_repeats 1
+    --subsample_sizes 10
+    --subsample_depths 1000000
+    --subsample_seed 62831
+)
+
 container_args=()
 if [[ "$smoke_docker" == 0 ]]; then
     container_args=(-without-docker)
@@ -241,6 +257,7 @@ fi
         "${synth_args[@]}" \
         "${svc_args[@]}" \
         "${enet_args[@]}" \
+        "${subsample_args[@]}" \
         --pareml true \
         -w "$work_dir" \
         -with-trace "$log_dir/trace.tsv"
@@ -1828,6 +1845,72 @@ verify_enet_outputs() {
     fi
 }
 
+# Verify the compact durable outputs from either opt-in resampling branch.
+verify_subsampling_outputs() {
+    subsampling_dir="$output_dir/subsampling"
+    expected_methods=$((3 + smoke_enet))
+
+    if [[ "$smoke_sample_subsampling" == 1 ]]; then
+        for sample_table in \
+            sample_subsample_results.csv \
+            sample_subsample_gene_frequencies.csv \
+            sample_subsample_allocations.csv
+        do
+            require_file "$subsampling_dir/$sample_table"
+            [[ ! -L "$subsampling_dir/$sample_table" ]] ||
+                fail "sample-subsampling table is not a durable copy: $sample_table"
+        done
+        require_pdf "$subsampling_dir/sample_subsample_plot.pdf"
+        [[ "$(awk 'END { print NR - 1 }' "$subsampling_dir/sample_subsample_results.csv")" \
+            -eq "$expected_methods" ]] || fail "unexpected sample-subsampling result count"
+        [[ "$(awk 'END { print NR - 1 }' "$subsampling_dir/sample_subsample_allocations.csv")" \
+            -eq 20 ]] || fail "sample subsampling did not retain 10 samples per phenotype"
+    else
+        [[ ! -e "$subsampling_dir/sample_subsample_results.csv" ]] ||
+            fail "disabled sample subsampling produced results"
+    fi
+
+    if [[ "$smoke_depth_subsampling" == 1 ]]; then
+        for depth_table in \
+            depth_subsample_results.csv \
+            depth_subsample_gene_frequencies.csv \
+            depth_subsample_library_metrics.csv
+        do
+            require_file "$subsampling_dir/$depth_table"
+            [[ ! -L "$subsampling_dir/$depth_table" ]] ||
+                fail "depth-subsampling table is not a durable copy: $depth_table"
+        done
+        require_pdf "$subsampling_dir/depth_subsample_plot.pdf"
+        [[ "$(awk 'END { print NR - 1 }' "$subsampling_dir/depth_subsample_results.csv")" \
+            -eq "$expected_methods" ]] || fail "unexpected depth-subsampling result count"
+        awk -F',' '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    gsub(/^"|"$/, "", $i)
+                    column[$i] = i
+                }
+                next
+            }
+            {
+                target = $(column["target_depth"])
+                prefilter = $(column["thinned_prefilter_depth"])
+                postfilter = $(column["postfilter_depth"])
+                if (target != 1000000 || prefilter != target || postfilter > target) exit 2
+                rows += 1
+            }
+            END { if (rows != 54) exit 3 }
+        ' "$subsampling_dir/depth_subsample_library_metrics.csv" ||
+            fail "depth subsampling did not retain exact one-million-count libraries"
+    else
+        [[ ! -e "$subsampling_dir/depth_subsample_results.csv" ]] ||
+            fail "disabled depth subsampling produced results"
+    fi
+
+    if [[ "$smoke_sample_subsampling" == 0 && "$smoke_depth_subsampling" == 0 ]]; then
+        [[ ! -d "$subsampling_dir" ]] || fail "disabled subsampling produced an output directory"
+    fi
+}
+
 for smoke_pdf in \
     QC_plots.pdf \
     permute_plot.pdf \
@@ -1892,6 +1975,7 @@ if [[ "$smoke_enet" == 1 ]]; then
     verify_enet_trace_keys
     verify_enet_outputs
 fi
+verify_subsampling_outputs
 if [[ "$smoke_synth" == 1 ]]; then
     verify_fullsynth_datasets
     verify_fullsynth_metrics
@@ -1975,6 +2059,24 @@ else
     case "$enet_plot_dir" in
         "$plot_dir"/enet) rm -rf -- "$enet_plot_dir" ;;
         *) fail "refusing to remove unexpected elastic-net artifact directory: $enet_plot_dir" ;;
+    esac
+fi
+
+subsampling_plot_dir="$plot_dir/subsampling"
+if [[ "$smoke_sample_subsampling" == 1 || "$smoke_depth_subsampling" == 1 ]]; then
+    case "$subsampling_plot_dir" in
+        "$plot_dir"/subsampling) rm -rf -- "$subsampling_plot_dir" ;;
+        *) fail "refusing to refresh unexpected subsampling artifact directory: $subsampling_plot_dir" ;;
+    esac
+    mkdir -p "$subsampling_plot_dir"
+    for subsampling_artifact in "$output_dir"/subsampling/*; do
+        [[ -e "$subsampling_artifact" ]] || fail "no subsampling artifacts were available to retain"
+        cp -L "$subsampling_artifact" "$subsampling_plot_dir/"
+    done
+else
+    case "$subsampling_plot_dir" in
+        "$plot_dir"/subsampling) rm -rf -- "$subsampling_plot_dir" ;;
+        *) fail "refusing to remove unexpected subsampling artifact directory: $subsampling_plot_dir" ;;
     esac
 fi
 

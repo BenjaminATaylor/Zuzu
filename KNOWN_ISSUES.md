@@ -93,7 +93,7 @@ Impact: rebuilding or rerunning later can change behaviour and numerical results
 
 ### KI-022: Automated regression coverage is limited and is not run in CI
 
-[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, plotting, and the durable QC, baseline, overlap, and permutation tables. `SMOKE_SYNTH=1` additionally exercises full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including the adaptive coarse/refined search, model-level signal gate, estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. Combining both flags also checks the nine gated full-synthetic SVC paths and their shared summaries. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
+[`tests/smoke.sh`](tests/smoke.sh) provides a lightweight default cold integration check for cleaning, QC, the three non-ML methods, permutation, quasi-permutation, aggregation, plotting, and the durable QC, baseline, overlap, and permutation tables. `SMOKE_SYNTH=1` additionally exercises full-synthetic generation, analysis, aggregation, and plotting. `SMOKE_SAMPLE_SUBSAMPLING=1` and `SMOKE_DEPTH_SUBSAMPLING=1` exercise one small target from each optional robustness branch, including exact pre-filter depth totals and their copied aggregate tables. `SMOKE_SVC=1` exercises the baseline and constrained-permutation SVC paths, including the adaptive coarse/refined search, model-level signal gate, estimator structure, normalization, class direction, outputs, and saved raw-count prediction bundles. Combining the SVC and synthetic flags also checks the nine gated full-synthetic SVC paths and their shared summaries. The checks assert structural invariants and exact metric relationships, but they do not pin expected inferential results or run in a CI workflow. The scripts under `sandbox/` remain exploratory rather than runner-integrated tests.
 
 Impact: major workflow breakage and metric inconsistencies are easier to detect, but dependency-driven numerical changes and failures outside the covered invariants can still go unnoticed.
 
@@ -105,7 +105,7 @@ Impact: runs are difficult to audit or reproduce after the work directory and co
 
 ### KI-025: Published outputs depend on the work cache
 
-With the current default `publishDir` mode, most plots and non-tabular outputs are symlinks into `work/`. The conventional baseline tables and the QC, membership, pairwise-overlap, combined permutation, and aggregated synthetic tables are explicit copied exceptions.
+With the current default `publishDir` mode, most plots and non-tabular outputs are symlinks into `work/`. The conventional baseline tables and the QC, membership, pairwise-overlap, combined permutation, aggregated synthetic, and optional resampling tables are explicit copied exceptions.
 
 Impact: moving the repository or cleaning the work directory breaks published results, and retaining results requires retaining the much larger task cache.
 
