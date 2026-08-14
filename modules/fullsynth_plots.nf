@@ -7,6 +7,7 @@ process FULLSYNTH_PLOTS {
     path(edger_synths,  stageAs: 'edger/outframe_?.csv')
     path(wilcox_synths, stageAs: 'wilcox/outframe_?.csv')
     path(svc_synths,    stageAs: 'svc/outframe_?.csv')
+    path(enet_synths,   stageAs: 'enet/outframe_?.csv')
 
     output:
     path "synth_plot.pdf"
@@ -66,20 +67,36 @@ process FULLSYNTH_PLOTS {
     deseq.synth.input  = read_fullsynths("deseq",  "DESeq2")
     edger.synth.input  = read_fullsynths("edger",  "edgeR")
     wilcox.synth.input = read_fullsynths("wilcox", "Wilcoxon")
+    fullsynth.results = bind_rows(deseq.synth.input,
+                                  edger.synth.input,
+                                  wilcox.synth.input)
 
     if("$params.mlstep" == "true"){
         svc.synth.input = read_fullsynths("svc", "SVC RFE-CV supported signature")
-        fullsynth.results = bind_rows(deseq.synth.input,
-                                      edger.synth.input,
-                                      wilcox.synth.input,
-                                      svc.synth.input)
-    } else {
-        fullsynth.results = bind_rows(deseq.synth.input,
-                                      edger.synth.input,
-                                      wilcox.synth.input)
+        fullsynth.results = bind_rows(fullsynth.results, svc.synth.input)
     }
 
+    if("$params.enetstep" == "true"){
+        enet.synth.input = read_fullsynths(
+            "enet",
+            "Stability-selected elastic-net features"
+        )
+        fullsynth.results = bind_rows(fullsynth.results, enet.synth.input)
+    }
+
+    # Preserve the scientific comparison order in tables and plot facets
+    method.levels = c("DESeq2", "edgeR", "Wilcoxon")
+    if("$params.mlstep" == "true"){
+        method.levels = c(method.levels, "SVC RFE-CV supported signature")
+    }
+    if("$params.enetstep" == "true"){
+        method.levels = c(
+            method.levels,
+            "Stability-selected elastic-net features"
+        )
+    }
     fullsynth.results = fullsynth.results %>%
+        mutate(method = factor(method, levels = method.levels)) %>%
         arrange(method, replicate, totalnum, refnum, altnum, depth)
     write.csv(fullsynth.results, "synth_results.csv", row.names = FALSE)
 

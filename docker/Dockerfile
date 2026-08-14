@@ -21,12 +21,13 @@ RUN pip install --no-cache-dir --upgrade pip --break-system-packages  \
 
 # Install R packages from binary (much quicker than using install.packages)
 COPY ./requirements-rbin.txt .
-RUN cat requirements-rbin.txt | xargs apt-get install -y -qq
+RUN apt-get update \
+  && xargs -a requirements-rbin.txt apt-get install -y -qq \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install any chosen R packages that aren't available as binaries
 COPY ./requirements-src.R .
 RUN Rscript requirements-src.R
-
 
 
 

@@ -7,6 +7,7 @@ process PERMUTE_HISTS{
   path(edger_infiles,  stageAs: 'edger/edger_table_?.csv')
   path(wilcox_infiles, stageAs: 'wilcox/wilcox_table_?.csv')
   path(SVC_infiles,    stageAs: 'svc/svc_table_?.csv')
+  path(enet_infiles,   stageAs: 'enet/enet_stable_features_?.csv')
   path deseq_poorfits
 
   output:
@@ -37,25 +38,68 @@ process PERMUTE_HISTS{
     }) %>% list_cbind() %>% rowSums(na.rm = TRUE)
   }
 
+  read_permfeatures_enet = function(dir, universe){
+    result = setNames(integer(length(universe)), universe)
+    files = list.files(dir, full.names = TRUE)
+    if(length(files) == 0L){
+      stop("No elastic-net permutation feature tables were supplied")
+    }
+    for(file in files){
+      frame = read.csv(file, check.names = FALSE, stringsAsFactors = FALSE)
+      if(!"gene" %in% names(frame)){
+        stop(sprintf("Elastic-net permutation table lacks gene: %s", basename(file)))
+      }
+      genes = as.character(frame\$gene)
+      if(anyNA(genes) || anyDuplicated(genes)){
+        stop(sprintf("Elastic-net permutation table has invalid genes: %s", basename(file)))
+      }
+      missing = setdiff(genes, universe)
+      if(length(missing) > 0L){
+        stop(sprintf(
+          "Elastic-net permutation table contains %d genes outside the common universe",
+          length(missing)
+        ))
+      }
+      result[genes] = result[genes] + 1L
+    }
+    result
+  }
+
   deseq.permdegs  = read_permdegs_r("deseq")
   edger.permdegs  = read_permdegs_r("edger")
   wilcox.permdegs = read_permdegs_r("wilcox")
 
-  if("$params.mlstep" == "true"){
-    SVC.permfeatures = read_permfeatures_py("svc")
-    permhist.in = cbind(deseq.permdegs,
-                        edger.permdegs,
-                        wilcox.permdegs,
-                        SVC.permfeatures) %>%
-      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon", "SVC RFE-CV candidates")) %>%
-      melt()
-  } else {
-    permhist.in = cbind(deseq.permdegs,
+  # Combine all requested methods over the common gene order
+  permhist.wide = cbind(deseq.permdegs,
                         edger.permdegs,
                         wilcox.permdegs) %>%
-      `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon")) %>%
-      melt()
+    `colnames<-`(c("DESeq2", "edgeR", "Wilcoxon"))
+
+  if("$params.mlstep" == "true"){
+    SVC.permfeatures = read_permfeatures_py("svc")
+    if(!setequal(names(SVC.permfeatures), row.names(permhist.wide))){
+      stop("SVC permutation features do not match the common gene universe")
+    }
+    permhist.wide = cbind(
+      permhist.wide,
+      "SVC RFE-CV candidates" =
+        SVC.permfeatures[row.names(permhist.wide)]
+    )
   }
+
+  if("$params.enetstep" == "true"){
+    enet.permfeatures = read_permfeatures_enet(
+      "enet",
+      row.names(permhist.wide)
+    )
+    permhist.wide = cbind(
+      permhist.wide,
+      "Stability-selected elastic net" =
+        enet.permfeatures[row.names(permhist.wide)]
+    )
+  }
+
+  permhist.in = melt(permhist.wide)
 
   # Generate breaks contingent on number of perms
   cutbreaks = cut(seq(1, nperms + 1), breaks = 5, right = TRUE) %>% levels() %>%

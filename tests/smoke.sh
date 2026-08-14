@@ -10,6 +10,9 @@ plot_dir="$script_dir/.smoke-plots"
 smoke_nperms="${SMOKE_NPERMS:-1}"
 smoke_synth="${SMOKE_SYNTH:-0}"
 smoke_svc="${SMOKE_SVC:-0}"
+smoke_enet="${SMOKE_ENET:-0}"
+smoke_docker="${SMOKE_DOCKER:-1}"
+smoke_container="${SMOKE_CONTAINER:-}"
 smoke_max_permute_correlation="0.6"
 
 fail() {
@@ -24,14 +27,23 @@ fail() {
 [[ "$smoke_nperms" =~ ^[1-9][0-9]*$ ]] || fail "SMOKE_NPERMS must be a positive integer"
 [[ "$smoke_synth" =~ ^[01]$ ]] || fail "SMOKE_SYNTH must be either 0 or 1"
 [[ "$smoke_svc" =~ ^[01]$ ]] || fail "SMOKE_SVC must be either 0 or 1"
+[[ "$smoke_enet" =~ ^[01]$ ]] || fail "SMOKE_ENET must be either 0 or 1"
+[[ "$smoke_docker" =~ ^[01]$ ]] || fail "SMOKE_DOCKER must be either 0 or 1"
 fullsynth_method_count=3
 if [[ "$smoke_svc" == 1 ]]; then
-    fullsynth_method_count=4
+    ((fullsynth_method_count += 1))
+fi
+if [[ "$smoke_enet" == 1 ]]; then
+    ((fullsynth_method_count += 1))
 fi
 
 command -v nextflow >/dev/null || fail "Nextflow is not installed"
-command -v docker >/dev/null || fail "Docker is not installed"
-docker info >/dev/null 2>&1 || fail "the Docker daemon is unavailable"
+if [[ "$smoke_docker" == 1 ]]; then
+    command -v docker >/dev/null || fail "Docker is not installed"
+    docker info >/dev/null 2>&1 || fail "the Docker daemon is unavailable"
+elif [[ "$smoke_svc" == 1 ]]; then
+    fail "the opt-in SVC smoke validation currently requires Docker"
+fi
 
 # KI-026 currently requires collected work paths to remain under the repository
 # so they are visible inside the Docker container.
@@ -189,6 +201,27 @@ if [[ "$smoke_svc" == 1 ]]; then
     )
 fi
 
+enet_args=(--enetstep false)
+if [[ "$smoke_enet" == 1 ]]; then
+    # Keep the opt-in smoke run structural and fast. Production remains at
+    # 50 complementary pairs and pi = 0.90.
+    enet_args=(
+        --enetstep true
+        --enet_pairs 2
+        --enet_pi 0.75
+        --enet_folds 5
+        --enet_nlambda 20
+        --enet_seed 45217
+    )
+fi
+
+container_args=()
+if [[ "$smoke_docker" == 0 ]]; then
+    container_args=(-without-docker)
+elif [[ -n "$smoke_container" ]]; then
+    container_args=(-with-docker "$smoke_container")
+fi
+
 # The relaxed test-only anchor threshold gives the main smoke run stable,
 # nonempty anchor sets. Focused checks below cover the zero- and low-anchor cases.
 (
@@ -198,6 +231,7 @@ fi
         -C "$repo_dir/nextflow.config" \
         run "$repo_dir/main.nf" \
         -profile local \
+        "${container_args[@]}" \
         --samplesheet "$smoke_sheet" \
         --countsframe "$smoke_counts" \
         --reflevel "$smoke_reflevel" \
@@ -206,6 +240,7 @@ fi
         --truecutoff 0.05 \
         "${synth_args[@]}" \
         "${svc_args[@]}" \
+        "${enet_args[@]}" \
         --pareml true \
         -w "$work_dir" \
         -with-trace "$log_dir/trace.tsv"
@@ -806,6 +841,7 @@ verify_fullsynth_metrics() {
         -v expected_rows="$expected_result_count" \
         -v expected_replicates="$smoke_nperms" \
         -v include_svc="$smoke_svc" \
+        -v include_enet="$smoke_enet" \
         -v expected_methods="$fullsynth_method_count" '
         function absolute(value) { return value < 0 ? -value : value }
         function is_integer(value) { return value ~ /^[0-9]+$/ }
@@ -844,8 +880,9 @@ verify_fullsynth_metrics() {
             depth = $(column["depth"])
 
             is_svc = method == "SVC RFE-CV supported signature"
+            is_enet = method == "Stability-selected elastic-net features"
             if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon" &&
-                !(include_svc && is_svc)) exit 3
+                !(include_svc && is_svc) && !(include_enet && is_enet)) exit 3
             if (!is_number(power) || !is_number(FDP) || !is_number(youden) ||
                 !is_number(depth)) exit 4
             if (!is_integer(TP) || !is_integer(FP) || !is_integer(TN) || !is_integer(FN) ||
@@ -895,6 +932,8 @@ verify_fullsynth_metrics() {
                 method_count["Wilcoxon"] != expected_per_method) exit 13
             if (include_svc &&
                 method_count["SVC RFE-CV supported signature"] != expected_per_method) exit 13
+            if (include_enet &&
+                method_count["Stability-selected elastic-net features"] != expected_per_method) exit 13
 
             expected_per_pair = expected_rows / 3
             expected_per_method_pair = expected_rows / (3 * expected_methods)
@@ -902,7 +941,9 @@ verify_fullsynth_metrics() {
             method_names[1] = "DESeq2"
             method_names[2] = "edgeR"
             method_names[3] = "Wilcoxon"
-            if (include_svc) method_names[4] = "SVC RFE-CV supported signature"
+            method_index = 3
+            if (include_svc) method_names[++method_index] = "SVC RFE-CV supported signature"
+            if (include_enet) method_names[++method_index] = "Stability-selected elastic-net features"
             for (i in expected_pairs) {
                 pair = expected_pairs[i]
                 if (pair_count[pair] != expected_per_pair) exit 14
@@ -918,6 +959,7 @@ verify_fullsynth_metrics() {
         -v expected_rows="$expected_summary_count" \
         -v expected_replicates="$smoke_nperms" \
         -v include_svc="$smoke_svc" \
+        -v include_enet="$smoke_enet" \
         -v expected_methods="$fullsynth_method_count" '
         function is_integer(value) { return value ~ /^[0-9]+$/ }
         function is_number(value) {
@@ -947,7 +989,8 @@ verify_fullsynth_metrics() {
             n_no_calls = $(column["n_no_calls"])
 
             if (method != "DESeq2" && method != "edgeR" && method != "Wilcoxon" &&
-                !(include_svc && method == "SVC RFE-CV supported signature")) exit 3
+                !(include_svc && method == "SVC RFE-CV supported signature") &&
+                !(include_enet && method == "Stability-selected elastic-net features")) exit 3
             if (variable != "power" && variable != "FDP" && variable != "youden_index") exit 4
             if (!is_number(mean) || !is_integer(n_valid) || !is_integer(n_total) ||
                 !is_integer(n_no_calls) || !is_integer(refnum) || !is_integer(altnum) ||
@@ -978,7 +1021,9 @@ verify_fullsynth_metrics() {
             method_names[1] = "DESeq2"
             method_names[2] = "edgeR"
             method_names[3] = "Wilcoxon"
-            if (include_svc) method_names[4] = "SVC RFE-CV supported signature"
+            method_index = 3
+            if (include_svc) method_names[++method_index] = "SVC RFE-CV supported signature"
+            if (include_enet) method_names[++method_index] = "Stability-selected elastic-net features"
             for (i in expected_pairs) {
                 pair = expected_pairs[i]
                 if (pair_count[pair] != expected_per_pair) exit 14
@@ -1403,6 +1448,168 @@ verify_svc_outputs() {
     fi
 }
 
+# Verify the opt-in elastic-net branch without changing the default smoke path.
+verify_enet_trace_keys() {
+    basic_matches="$(awk -F '\t' '
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                if ($i == "name") name_column = i
+                if ($i == "status") status_column = i
+            }
+            if (!name_column || !status_column) exit 2
+            next
+        }
+        index($(name_column), "ENET_BASIC") && $(status_column) == "COMPLETED" {
+            matches += 1
+        }
+        END { print matches + 0 }
+    ' "$log_dir/trace.tsv")" || fail "could not parse the elastic-net basic task"
+    [[ "$basic_matches" -eq 1 ]] ||
+        fail "expected one completed ENET_BASIC task, found $basic_matches"
+
+    for ((replicate_id = 1; replicate_id <= smoke_nperms; replicate_id++)); do
+        expected_tag="ENET_PERMUTE (replicate=$replicate_id)"
+        permute_matches="$(awk -F '\t' -v expected="$expected_tag" '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "name") name_column = i
+                    if ($i == "status") status_column = i
+                }
+                if (!name_column || !status_column) exit 2
+                next
+            }
+            index($(name_column), expected) && $(status_column) == "COMPLETED" {
+                matches += 1
+            }
+            END { print matches + 0 }
+        ' "$log_dir/trace.tsv")" || fail "could not parse $expected_tag"
+        [[ "$permute_matches" -eq 1 ]] ||
+            fail "expected one completed task for $expected_tag, found $permute_matches"
+    done
+
+    if [[ "$smoke_synth" == 1 ]]; then
+        synthetic_matches="$(awk -F '\t' '
+            NR == 1 {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "name") name_column = i
+                    if ($i == "status") status_column = i
+                }
+                if (!name_column || !status_column) exit 2
+                next
+            }
+            index($(name_column), "ENET_FULLSYNTH (") &&
+            $(status_column) == "COMPLETED" { matches += 1 }
+            END { print matches + 0 }
+        ' "$log_dir/trace.tsv")" || fail "could not parse ENET_FULLSYNTH tasks"
+        expected_synthetic=$((smoke_nperms * 3 * 3))
+        [[ "$synthetic_matches" -eq "$expected_synthetic" ]] ||
+            fail "expected $expected_synthetic completed ENET_FULLSYNTH tasks, found $synthetic_matches"
+    fi
+}
+
+verify_enet_outputs() {
+    enet_output_dir="$output_dir/enet"
+    [[ -d "$enet_output_dir" ]] || fail "enabled elastic-net output directory is missing"
+
+    for basic_artifact in \
+        enet_gene_stability.csv \
+        enet_stable_features.csv \
+        enet_summary.csv \
+        enet_fit_diagnostics.csv \
+        enet_allocations_and_inner_folds.csv \
+        enet_metadata.json
+    do
+        require_file "$enet_output_dir/$basic_artifact"
+    done
+    for basic_plot in \
+        enet_top_features.png \
+        enet_base_model_sizes.png \
+        enet_top_feature_selection_matrix.png
+    do
+        require_png "$enet_output_dir/$basic_plot"
+    done
+
+    total_fits="$(single_row_csv_value "$enet_output_dir/enet_summary.csv" total_half_sample_fits)" ||
+        fail "could not read elastic-net total fit count"
+    pair_count="$(single_row_csv_value "$enet_output_dir/enet_summary.csv" complementary_pairs)" ||
+        fail "could not read elastic-net pair count"
+    pi_threshold="$(single_row_csv_value "$enet_output_dir/enet_summary.csv" pi_threshold)" ||
+        fail "could not read elastic-net stability threshold"
+    [[ "$total_fits:$pair_count:$pi_threshold" == "4:2:0.75" ]] ||
+        fail "elastic-net smoke settings were not retained exactly"
+
+    diagnostic_rows="$(awk 'END { print NR - 1 }' "$enet_output_dir/enet_fit_diagnostics.csv")"
+    [[ "$diagnostic_rows" -eq 4 ]] ||
+        fail "expected four baseline elastic-net fit diagnostics, found $diagnostic_rows"
+    grep -Fq 'unset_and_uncapped' "$enet_output_dir/enet_metadata.json" ||
+        fail "elastic-net metadata does not record the uncapped selector"
+    grep -Fq '"pfer_claim": "none"' "$enet_output_dir/enet_metadata.json" ||
+        fail "elastic-net metadata does not disclaim a PFER claim"
+
+    awk -F',' '
+        function clean(value) { sub(/^"/, "", value); sub(/"$/, "", value); return value }
+        function absolute(value) { return value < 0 ? -value : value }
+        NR == 1 {
+            for (i = 1; i <= NF; i++) column[clean($i)] = i
+            split("gene selection_count total_fits selection_probability stable_feature rank", names, " ")
+            for (i in names) if (!(names[i] in column)) exit 2
+            next
+        }
+        {
+            rows += 1
+            count = clean($(column["selection_count"])) + 0
+            fits = clean($(column["total_fits"])) + 0
+            probability = clean($(column["selection_probability"])) + 0
+            stable = clean($(column["stable_feature"]))
+            rank = clean($(column["rank"])) + 0
+            if (clean($(column["gene"])) == "" || fits != 4 || count < 0 || count > fits ||
+                absolute(probability - count / fits) > 1e-12 || rank != rows) exit 3
+            expected = count >= 3 ? "TRUE" : "FALSE"
+            if (stable != expected) exit 4
+            if (stable == "TRUE") stable_rows += 1
+        }
+        END {
+            if (rows == 0) exit 5
+            print rows, stable_rows + 0
+        }
+    ' "$enet_output_dir/enet_gene_stability.csv" > "$smoke_root/enet_gene_counts.txt" ||
+        fail "invalid baseline elastic-net gene stability table"
+    read -r tested_genes stable_genes < "$smoke_root/enet_gene_counts.txt"
+    recorded_tested="$(single_row_csv_value "$enet_output_dir/enet_summary.csv" n_tested)" ||
+        fail "could not read elastic-net tested-gene count"
+    recorded_stable="$(single_row_csv_value "$enet_output_dir/enet_summary.csv" stable_feature_count)" ||
+        fail "could not read elastic-net stable-feature count"
+    stable_table_rows="$(awk 'END { print NR - 1 }' "$enet_output_dir/enet_stable_features.csv")"
+    [[ "$tested_genes:$stable_genes" == "$recorded_tested:$recorded_stable" &&
+       "$stable_table_rows" -eq "$recorded_stable" ]] ||
+        fail "elastic-net full, stable-only, and summary tables disagree"
+
+    expected_permutation_artifacts="$smoke_nperms"
+    for suffix in stable_features.csv summary.csv fit_diagnostics.csv metadata.json; do
+        observed="$(find -L "$enet_output_dir" -maxdepth 1 -type f \
+            -name "enet_permute_replicate_*_$suffix" -print | awk 'END { print NR + 0 }')"
+        [[ "$observed" -eq "$expected_permutation_artifacts" ]] ||
+            fail "expected $expected_permutation_artifacts elastic-net permutation $suffix files, found $observed"
+    done
+
+    if [[ "$smoke_synth" == 1 ]]; then
+        expected_synthetic=$((smoke_nperms * 3 * 3))
+        for suffix in stable_features.csv summary.csv fit_diagnostics.csv metadata.json; do
+            observed="$(find -L "$enet_output_dir" -maxdepth 1 -type f \
+                -name "enet_fullsynth_*_$suffix" -print | awk 'END { print NR + 0 }')"
+            [[ "$observed" -eq "$expected_synthetic" ]] ||
+                fail "expected $expected_synthetic elastic-net synthetic $suffix files, found $observed"
+        done
+        small_summary="$(find -L "$enet_output_dir" -maxdepth 1 -type f \
+            -name 'enet_fullsynth_*_ref_11_alt_9_*_summary.csv' -print | head -n 1)"
+        require_file "$small_summary"
+        resolved_small="$(single_row_csv_value "$small_summary" resolved_folds)" ||
+            fail "could not read the smallest synthetic elastic-net fold count"
+        [[ "$resolved_small" -eq 3 ]] ||
+            fail "the smallest synthetic elastic-net cell should resolve to three folds"
+    fi
+}
+
 for smoke_pdf in \
     QC_plots.pdf \
     permute_plot.pdf \
@@ -1438,6 +1645,9 @@ fi
 if [[ "$smoke_svc" == 0 ]]; then
     [[ ! -d "$output_dir/svctables" ]] || fail "disabled SVC output was published"
 fi
+if [[ "$smoke_enet" == 0 ]]; then
+    [[ ! -d "$output_dir/enet" ]] || fail "disabled elastic-net output was published"
+fi
 require_file "$log_dir/trace.tsv"
 verify_filter_warning
 locate_clean_outputs
@@ -1454,6 +1664,10 @@ if [[ "$smoke_svc" == 1 ]]; then
     if [[ "$smoke_synth" == 1 ]]; then
         verify_svc_fullsynth_outputs
     fi
+fi
+if [[ "$smoke_enet" == 1 ]]; then
+    verify_enet_trace_keys
+    verify_enet_outputs
 fi
 if [[ "$smoke_synth" == 1 ]]; then
     verify_fullsynth_datasets
@@ -1476,8 +1690,12 @@ done
 
 if [[ "$smoke_synth" == 1 ]]; then
     cp -L "$output_dir/synth_plot.pdf" "$plot_dir/synth_plot.pdf"
+    cp -L "$output_dir/synth_results.csv" "$plot_dir/synth_results.csv"
+    cp -L "$output_dir/synth_summary.csv" "$plot_dir/synth_summary.csv"
 else
     rm -f "$plot_dir/synth_plot.pdf"
+    rm -f "$plot_dir/synth_results.csv"
+    rm -f "$plot_dir/synth_summary.csv"
 fi
 
 cp -L "$output_dir/quasi_results.csv" "$plot_dir/quasi_results.csv"
@@ -1503,6 +1721,24 @@ else
     case "$svc_plot_dir" in
         "$plot_dir"/svc) rm -rf -- "$svc_plot_dir" ;;
         *) fail "refusing to remove unexpected SVC artifact directory: $svc_plot_dir" ;;
+    esac
+fi
+
+enet_plot_dir="$plot_dir/enet"
+if [[ "$smoke_enet" == 1 ]]; then
+    case "$enet_plot_dir" in
+        "$plot_dir"/enet) rm -rf -- "$enet_plot_dir" ;;
+        *) fail "refusing to refresh unexpected elastic-net artifact directory: $enet_plot_dir" ;;
+    esac
+    mkdir -p "$enet_plot_dir"
+    for enet_artifact in "$output_dir"/enet/enet_*; do
+        [[ -e "$enet_artifact" ]] || fail "no elastic-net artifacts were available to retain"
+        cp -L "$enet_artifact" "$enet_plot_dir/"
+    done
+else
+    case "$enet_plot_dir" in
+        "$plot_dir"/enet) rm -rf -- "$enet_plot_dir" ;;
+        *) fail "refusing to remove unexpected elastic-net artifact directory: $enet_plot_dir" ;;
     esac
 fi
 

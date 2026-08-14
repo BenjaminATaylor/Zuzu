@@ -7,12 +7,14 @@ include { CREATE_BREAKS             } from './modules/create_breaks.nf'
 include { DESEQ_BASIC               } from './modules/deseq_basic.nf'
 include { EDGER_BASIC               } from './modules/edger_basic.nf'
 include { WILCOXON_BASIC            } from './modules/wilcoxon_basic.nf'
+include { ENET_BASIC                } from './modules/enet_basic.nf'
 include { SVC_BASIC                 } from './modules/svc_basic.nf'
 //include { SVM_BASIC } from './modules/svm_basic.nf'
 include { DATA_PERMUTE              } from './modules/data_permute.nf'
 include { DESEQ_PERMUTE             } from './modules/deseq_permute.nf'
 include { EDGER_PERMUTE             } from './modules/edger_permute.nf'
 include { WILCOXON_PERMUTE          } from './modules/wilcoxon_permute.nf'
+include { ENET_PERMUTE              } from './modules/enet_permute.nf'
 include { SVC_PERMUTE               } from './modules/svc_permute.nf'
 //include { SVM_PERMUTE } from './modules/svm_permute.nf'
 include { PERMUTE_PLOTS             } from './modules/permute_plots.nf'
@@ -31,6 +33,7 @@ include { DATA_FULLSYNTH            } from './modules/data_fullsynth.nf'
 include { DESEQ_FULLSYNTH           } from './modules/deseq_fullsynth.nf'
 include { EDGER_FULLSYNTH           } from './modules/edger_fullsynth.nf'
 include { WILCOXON_FULLSYNTH        } from './modules/wilcoxon_fullsynth.nf'
+include { ENET_FULLSYNTH            } from './modules/enet_fullsynth.nf'
 include { SVC_FULLSYNTH             } from './modules/svc_fullsynth.nf'
 include { SVC_FULLSYNTH_POSTPROCESS } from './modules/svc_fullsynth_postprocess.nf'
 include { FULLSYNTH_PLOTS           } from './modules/fullsynth_plots.nf'
@@ -46,6 +49,9 @@ params.synthstep = true
 // If this is a debug run, pare down the data passed to the ML methods because these take a long time to run
 params.pareml    = false
 params.mlstep    = true
+
+// Keep the provisional elastic-net branch independently opt-in
+params.enetstep  = false
 
 //def cutline = params.samplenum.intdiv(3)
 //def breaks = [cutline,cutline*2,params.samplenum]
@@ -86,6 +92,8 @@ workflow {
   // Reuse the SVC normalization sidecars for baseline and permuted fits
   svc_library_sizes = CLEANINPUTS.out.svc_library_sizes
   svc_library_genes = CLEANINPUTS.out.svc_library_genes
+  // Reuse the pre-filter library sizes for observed elastic-net datasets
+  enet_library_sizes = CLEANINPUTS.out.svc_library_sizes
   QUALITYCONTROL(CLEANINPUTS.out.cleaned)
   CREATE_BREAKS(ch_samplesheet)
   // Emit each generated reference/alternative subsample pair
@@ -96,6 +104,9 @@ workflow {
   DESEQ_BASIC(CLEANINPUTS.out.cleaned)
   EDGER_BASIC(CLEANINPUTS.out.cleaned)
   WILCOXON_BASIC(CLEANINPUTS.out.cleaned)
+  if (params.enetstep) {
+    ENET_BASIC(CLEANINPUTS.out.cleaned, enet_library_sizes)
+  }
   if (params.mlstep) {
     SVC_BASIC(
       CLEANINPUTS.out.cleaned,
@@ -113,6 +124,10 @@ workflow {
   EDGER_PERMUTE(DATA_PERMUTE.out.frames)
   // For Wilcoxon
   WILCOXON_PERMUTE(DATA_PERMUTE.out.frames)
+  if (params.enetstep) {
+    // For stability-selected elastic net
+    ENET_PERMUTE(DATA_PERMUTE.out.frames, enet_library_sizes)
+  }
   if (params.mlstep) {
     // For SVC
     SVC_PERMUTE(
@@ -131,6 +146,10 @@ workflow {
     WILCOXON_PERMUTE.out.nDEGs.collect(),
     params.mlstep ? SVC_BASIC.out.table : dummypath,
     params.mlstep ? SVC_PERMUTE.out.nFeatures.collect() : dummypath,
+    params.enetstep ? ENET_BASIC.out.summary : dummypath,
+    params.enetstep
+      ? ENET_PERMUTE.out.summary.map { _replicate, summary -> summary }.collect()
+      : dummypath,
   )
   // Compare baseline DEG calls across methods
   INTER_OBSERVER_BASIC(
@@ -148,6 +167,9 @@ workflow {
     EDGER_PERMUTE.out.outfile.collect(),
     WILCOXON_PERMUTE.out.outfile.collect(),
     params.mlstep ? SVC_PERMUTE.out.outfile.collect() : dummypath,
+    params.enetstep
+      ? ENET_PERMUTE.out.stable.map { _replicate, stable -> stable }.collect()
+      : dummypath,
     INTER_OBSERVER_BASIC.out.deseq_poorfits,
   )
 
@@ -177,6 +199,9 @@ workflow {
     DESEQ_FULLSYNTH(DATA_FULLSYNTH.out)
     EDGER_FULLSYNTH(DATA_FULLSYNTH.out)
     WILCOXON_FULLSYNTH(DATA_FULLSYNTH.out)
+    if (params.enetstep) {
+      ENET_FULLSYNTH(DATA_FULLSYNTH.out)
+    }
     if (params.mlstep) {
       SVC_FULLSYNTH(DATA_FULLSYNTH.out)
       SVC_FULLSYNTH_POSTPROCESS(SVC_FULLSYNTH.out.result)
@@ -187,6 +212,7 @@ workflow {
       EDGER_FULLSYNTH.out.collect(),
       WILCOXON_FULLSYNTH.out.collect(),
       params.mlstep ? SVC_FULLSYNTH_POSTPROCESS.out.collect() : dummypath,
+      params.enetstep ? ENET_FULLSYNTH.out.result.collect() : dummypath,
     )
   }
 }

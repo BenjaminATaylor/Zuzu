@@ -11,8 +11,10 @@ process PERMUTE_PLOTS{
   val edger_perms
   path wilcox_table
   val wilcox_perms
-  path SVC_table
+  path SVC_table, stageAs: 'svc_observed.csv'
   val SVC_perms
+  path enet_summary, stageAs: 'enet_observed.csv'
+  path enet_perms, stageAs: 'enet_permute/enet_summary_?.csv'
 
   output:
   path "permute_plot.pdf"
@@ -63,7 +65,12 @@ process PERMUTE_PLOTS{
                                     nSelected = wilcox.ndegs,
                                     permutes = wilcox.perms)
   
-  # Only include ML outputs if specified by user
+  # Start with the three conventional methods
+  permuteplot.input = rbind(deseq.permute.input,
+                            edger.permute.input,
+                            wilcox.permute.input)
+
+  # Only include SVC outputs if specified by user
   if("$params.mlstep" == "true"){
     ## SVC inputs
     # Candidate features from the full model
@@ -78,18 +85,40 @@ process PERMUTE_PLOTS{
                                     nSelected = SVC.nfeatures,
                                     permutes = SVC.perms)
 
-    # Combined inputs for plotting
-    permuteplot.input = rbind(deseq.permute.input,
-                              edger.permute.input,
-                              wilcox.permute.input,
-                              SVC.permute.input)
-  } else {
-    # Combined inputs for plotting
-    permuteplot.input = rbind(deseq.permute.input,
-                              edger.permute.input,
-                              wilcox.permute.input)
-    
+    permuteplot.input = rbind(permuteplot.input, SVC.permute.input)
   }
+
+  # Include the fixed provisional elastic-net selector when requested
+  if("$params.enetstep" == "true"){
+    enet.observed = read.csv("$enet_summary", check.names = FALSE)
+    stopifnot(
+      nrow(enet.observed) == 1L,
+      "stable_feature_count" %in% names(enet.observed)
+    )
+    enet.files = list.files("enet_permute", full.names = TRUE)
+    if(length(enet.files) == 0L){
+      stop("No elastic-net permutation summaries were supplied")
+    }
+    enet.perms = vapply(enet.files, function(file){
+      frame = read.csv(file, check.names = FALSE)
+      if(nrow(frame) != 1L || !"stable_feature_count" %in% names(frame)){
+        stop(sprintf("Invalid elastic-net permutation summary: %s", basename(file)))
+      }
+      as.integer(frame\$stable_feature_count[[1]])
+    }, integer(1))
+    enet.permute.input = data.frame(
+      method = "Stability-selected elastic net",
+      nSelected = as.integer(enet.observed\$stable_feature_count[[1]]),
+      permutes = enet.perms
+    )
+    permuteplot.input = rbind(permuteplot.input, enet.permute.input)
+  }
+
+  # Preserve the workflow method order rather than sorting labels alphabetically
+  permuteplot.input\$method = factor(
+    permuteplot.input\$method,
+    levels = unique(permuteplot.input\$method)
+  )
 
   print(gg.permute <- ggplot(permuteplot.input, aes(x = method, y = permutes)) +
           geom_point(size = 3, alpha = 0.7) +

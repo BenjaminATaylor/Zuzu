@@ -4,6 +4,8 @@ r-cran-e1071
 r-cran-pracma
 r-cran-pheatmap
 r-cran-ggpubr
+r-cran-glmnet
+r-cran-jsonlite
 r-cran-vcd
 r-cran-viridis
 r-cran-upsetr
